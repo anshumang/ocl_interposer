@@ -6,6 +6,7 @@
 #include <map>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <assert.h>
 
 //This should be populated dynamically
 char *nodes[] = {"shiva.cc.gt.atl.ga.us"};
@@ -63,7 +64,8 @@ cl_int clGetPlatformIDs (cl_uint num_entries, cl_platform_id *platforms, cl_uint
 		memset((char *)&arg_pkt, 0, sizeof(get_platform_ids_));
 		memset((char *)&ret_pkt, 0, sizeof(get_platform_ids_));
 		
-		//Client receives this from the server - so hack sending one char which is ignored
+		//Client receives this from the server - so this is a hack to keep the rpc libray from crashing
+		//send one char , that is, pass an initialized pointer, which gets ignored
 		arg_pkt.platforms.buff_ptr = "\0";
 		arg_pkt.platforms.buff_len = sizeof(char);
 
@@ -107,6 +109,32 @@ cl_int clGetPlatformIDs (cl_uint num_entries, cl_platform_id *platforms, cl_uint
 	int num_entries_found = 0;
 	for(int i=0; i<num_nodes; i++){
 
+		std::map<int, int>::iterator it1 = num_platforms_per_node.find(i);
+		if(it1 == num_platforms_per_node.end()){
+			continue;
+		}
+
+		int num_platforms_curr_node = it1->second;
+		
+		int num_entries_needed = 0;
+		if(num_entries_found + num_platforms_curr_node > num_entries){
+			num_entries_needed = num_entries - num_entries_found;
+		}else{
+                        num_entries_needed = num_platforms_curr_node;
+		}
+
+		std::map<int, char*>::iterator it2 = platforms_per_node.find(i);
+		assert(it2 != platforms_per_node.end());
+		cl_platform_id *platforms_curr_node = (cl_platform_id *)(it2->second);
+
+		for(int j=0; j<num_entries_needed; j++){
+			cl_platform_id_ *platform_distr = (cl_platform_id_ *)malloc(sizeof(cl_platform_id_));
+			platform_distr->node = nodes[i];
+			platform_distr->clhandle = platforms_curr_node[j];
+			printf("[clGetPlatformIDs interposed] platforms[%d] = %p\n", num_entries_found + j, platform_distr->clhandle);
+		 	platforms[num_entries_found + j] = (cl_platform_id)platform_distr;	
+		}
+		num_entries_found += num_entries_needed;
 
 	}	
 
