@@ -15,7 +15,7 @@ int main(){
 		exit(-1);
 	}
 
-	printf("Num OpenCL platforms found %d\n", num_platforms);
+	printf("[main] Num OpenCL platforms found %d\n", num_platforms);
 
 	if(num_platforms > 0){
 	
@@ -30,7 +30,7 @@ int main(){
 
 		int i;
 		for(i=0; i<num_platforms; i++){
-			printf("Platform[%d] %p\n", i, platforms[i]);
+			printf("[main] platforms[%d]=%p\n", i, platforms[i]);
 
 
 			cl_uint num_devices = 0;
@@ -44,7 +44,7 @@ int main(){
 				exit(-1);
 			}
 
-			printf("Num OpenCL devices found %d\n", num_devices);
+			printf("[main] Num OpenCL devices found %d\n", num_devices);
 
 			if(num_devices > 0){
 
@@ -60,7 +60,7 @@ int main(){
 				}
 
 				for(i=0; i<num_devices; i++){
-					printf("Device[%d] %p\n", i, devices[i]);
+					printf("[main] Device[%d] %p\n", i, devices[i]);
 				}
 
 
@@ -72,7 +72,7 @@ int main(){
                                         exit(-1);
                                 }
 				
-				printf("Context %p\n", ctx);
+				printf("[main] Context %p\n", ctx);
 
 				int j;
 
@@ -87,7 +87,7 @@ int main(){
 						exit(-1);
 					}
 
-					printf("Command Queue[%d] %p\n", j, cmd_q[j]);
+					printf("[main] Command Queue[%d] %p\n", j, cmd_q[j]);
 
 				}
 			}
