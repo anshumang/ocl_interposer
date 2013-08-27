@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <assert.h>
+#include <vector>
 
 //This should be populated dynamically
 char *nodes[] = {"shiva.cc.gt.atl.ga.us"};
@@ -268,10 +269,130 @@ cl_int clGetDeviceIDs (cl_platform_id platform,cl_device_type device_type, cl_ui
 
 cl_context clCreateContext (const cl_context_properties *properties,cl_uint num_devices, const cl_device_id *devices,void (CL_CALLBACK*pfn_notify)(const char *errinfo, const void *private_info,size_t cb, void *user_data),void *user_data, cl_int *errcode_ret){
 
-	cl_context context = 0;
+	//Don't send the RPC if the args are invalid
+	if(!devices || !num_devices){
+		*errcode_ret = CL_INVALID_VALUE;
+		return 0;
+	}
 
-	*errcode_ret = CL_SUCCESS;
-	return context;
+	printf("[clCreateContext interposed] num_devices %d\n", num_devices);
+
+	cl_int err = CL_SUCCESS;	
+
+	std::map <char *, std::vector<cl_device_id> > devicevector_per_node;
+
+	for(int i=0; i<num_devices; i++){
+
+		cl_device_id_ *device_distr = (cl_device_id_ *)devices[i];
+
+		char *node = device_distr->node;
+
+		cl_device_id clhandle = device_distr->clhandle;
+		
+		std::map<char *, std::vector<cl_device_id> >::iterator it = devicevector_per_node.find(node);
+
+		if(it == devicevector_per_node.end()){
+			//printf("[clCreateContext interposed] first device on the node\n");
+			std::vector<cl_device_id> devicevector;
+			devicevector.push_back(clhandle);
+			devicevector_per_node.insert(make_pair(node, devicevector));
+		} else {
+			//printf("[clCreateContext interposed] second or more device on the node\n");
+			std::vector<cl_device_id> devicevector = it->second;
+			devicevector.push_back(clhandle);
+			devicevector_per_node[node] = devicevector;
+		}
+
+	}
+
+	int num_context_tuples = devicevector_per_node.size();
+	printf("[clCreateContext interposed] num_context_tuples %d\n", num_context_tuples);
+
+	cl_context_ *context_distr = (cl_context_ *)malloc(sizeof(cl_context_));
+	context_distr->context_tuples = (cl_context_elem_ *)malloc(sizeof(cl_context_elem_)*num_context_tuples);
+	context_distr->num_context_tuples = num_context_tuples;
+
+	int tuple_counter = 0;
+	for(std::map <char *, std::vector<cl_device_id> >::iterator it=devicevector_per_node.begin();
+		it != devicevector_per_node.end();
+		it++ ){
+
+		register CLIENT *clnt;
+		int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+		struct hostent *hp;
+		struct sockaddr_in server_addr;
+
+		char *curr_node = it->first;
+		/* get the internet address of RPC server */
+		if ((hp = gethostbyname(curr_node)) == NULL){
+			printf("Can't get address for %s\n",curr_node);
+			exit (-1);
+		}
+
+		bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+		server_addr.sin_family = AF_INET;
+		server_addr.sin_port = 0;
+
+		/* create TCP handle */
+		if ((clnt = clnttcp_create(&server_addr, CREATE_CONTEXT_PROG, CREATE_CONTEXT_VERS,
+						&sock, 0, 0)) == NULL){
+			clnt_pcreateerror("clnttcp_create");
+			exit(-1);
+		}
+
+		printf("[clCreateContext interposed]clnttcp_create OK\n");
+
+		xdrproc_t xdr_arg, xdr_ret;
+
+		xdr_arg = (xdrproc_t)_xdr_create_context;
+		xdr_ret = (xdrproc_t)_xdr_create_context;
+
+		create_context_ arg_pkt, ret_pkt;
+		memset((char *)&arg_pkt, 0, sizeof(create_context_));
+		memset((char *)&ret_pkt, 0, sizeof(create_context_));
+
+		std::vector<cl_device_id> devicevector = it->second;
+
+		arg_pkt.num_devices = devicevector.size();
+
+		cl_device_id *device_list = (cl_device_id *)malloc(arg_pkt.num_devices * sizeof(cl_device_id));
+
+		int device_count = 0;
+		for(std::vector<cl_device_id>::iterator itv=devicevector.begin();
+			itv != devicevector.end();
+			itv++){
+		
+			device_list[device_count++] = (*itv);
+			printf("[clCreateContext interposed] clhandle %p\n", (*itv));
+
+		}
+		assert(devicevector.size() == device_count);
+
+		arg_pkt.devices.buff_ptr = (char *)device_list;
+		arg_pkt.devices.buff_len = sizeof(cl_device_id)*device_count;
+
+		ret_pkt.devices.buff_ptr = NULL;
+
+		enum clnt_stat cs;
+		struct timeval  total_timeout;
+		total_timeout.tv_sec = 10;
+		total_timeout.tv_usec = 0;
+
+		cs=clnt_call(clnt, CREATE_CONTEXT, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+		if ( cs != RPC_SUCCESS){
+			printf("clnt_call failed \n");
+		}
+
+		err |= ret_pkt.err;
+
+		context_distr->context_tuples[tuple_counter++].node = curr_node;
+		context_distr->context_tuples[tuple_counter++].cl_handle = (cl_context)(ret_pkt.context);
+		printf("[clCreateContext interposed] context returned %p\n", ret_pkt.context);
+
+	}
+
+	*errcode_ret = err;
+	return (cl_context)context_distr;
 }
 
 cl_command_queue clCreateCommandQueue (cl_context context, cl_device_id device,cl_command_queue_properties properties,cl_int *errcode_ret){

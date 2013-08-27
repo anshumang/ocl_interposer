@@ -7,6 +7,7 @@
 void clGetPlatformIDs_server(get_platform_ids_ *argp, get_platform_ids_ *retp){
 
 	cl_int err = CL_SUCCESS;
+	retp->err = err;
 
         cl_uint num_platforms = 0;
 
@@ -16,6 +17,8 @@ void clGetPlatformIDs_server(get_platform_ids_ *argp, get_platform_ids_ *retp){
                 printf("clGetPlatformIDs failed with err %d\n", err);
                 exit(-1);
         }
+
+	retp->err |= err;
 
         printf("[clGetPlatformIDs_server] Num OpenCL platforms found %d\n", num_platforms);
 	retp->num_platforms_found = num_platforms;
@@ -30,6 +33,8 @@ void clGetPlatformIDs_server(get_platform_ids_ *argp, get_platform_ids_ *retp){
                         printf("clGetPlatformIDs failed with err %d\n", err);
                         exit(-1);
                 }
+
+		retp->err |= err;
 
 		for(int i=0; i<num_platforms; i++){
 			printf("[clGetPlatformIDs_server] platforms[%d]=%p\n",i, platforms[i]);
@@ -86,6 +91,7 @@ void clGetPlatformIDs_server_wrapper(struct svc_req *rqstp, register SVCXPRT *tr
 void clGetDeviceIDs_server(get_device_ids_ *argp, get_device_ids_ *retp){
 
 	cl_int err = CL_SUCCESS;
+	retp->err = err;
 
         cl_uint num_devices = 0;
 
@@ -99,6 +105,7 @@ void clGetDeviceIDs_server(get_device_ids_ *argp, get_device_ids_ *retp){
                 printf("clGetDeviceIDs failed with err %d\n", err);
                 exit(-1);
         }
+	retp->err |= err;
 
         printf("[clGetDeviceIDs_server] Num OpenCL devices found %d\n", num_devices);
 	retp->num_devices_found = num_devices;
@@ -113,6 +120,7 @@ void clGetDeviceIDs_server(get_device_ids_ *argp, get_device_ids_ *retp){
                         printf("clGetDeviceIDs failed with err %d\n", err);
                         exit(-1);
                 }
+		retp->err |= err;
 
 		for(int i=0; i<num_devices; i++){
 			printf("[clGetDeviceIDs_server] devices[%d]=%p\n",i, devices[i]);
@@ -126,6 +134,7 @@ void clGetDeviceIDs_server(get_device_ids_ *argp, get_device_ids_ *retp){
 		retp->devices.buff_len = sizeof(char);	
 	}
 }
+
 void clGetDeviceIDs_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
 
 	xdrproc_t xdr_arg, xdr_ret;
@@ -160,6 +169,75 @@ void clGetDeviceIDs_server_wrapper(struct svc_req *rqstp, register SVCXPRT *tran
                 exit (-1);
         }
 	printf("[clGetDeviceIDs_server_wrapper] svc_freeargs OK\n");
+
+        return;
+
+}
+
+void clCreateContext_server(create_context_ *argp, create_context_ *retp){
+
+	cl_int err = CL_SUCCESS;
+	retp->err = err;
+
+        cl_context context = 0;
+
+        printf("[clCreateContext_server] Num devices received %d\n", argp->num_devices);
+
+	cl_device_id *devices = (cl_device_id*)(argp->devices.buff_ptr);
+
+	for(int i=0; i<argp->num_devices; i++){
+		printf("[clCreateContext_server] devices[%d] = %p\n", i, devices[i]);
+	}
+
+        context  = clCreateContext(NULL, (cl_uint)(argp->num_devices), devices, NULL, NULL, &err);
+
+        if(err != CL_SUCCESS){
+                printf("clCreateContext failed with err %d\n", err);
+                exit(-1);
+        }
+	retp->err |= err;
+
+	retp->context = (unsigned long)context;
+        printf("[clCreateContext_server] context created %p\n", retp->context);
+
+	retp->devices.buff_ptr = "\0";
+	retp->devices.buff_len = sizeof(char);	
+}
+
+void clCreateContext_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_create_context;
+	xdr_ret = (xdrproc_t)_xdr_create_context;
+
+	create_context_ arg_pkt, ret_pkt;
+
+	memset((char *)&arg_pkt, 0, sizeof(create_context_));
+	memset((char *)&ret_pkt, 0, sizeof(create_context_));
+
+	arg_pkt.devices.buff_ptr = NULL;
+
+	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
+		svcerr_decode(transp);
+		exit(-1);
+	}
+	printf("[clCreateContext_server_wrapper] svc_getargs OK\n");
+
+	clCreateContext_server(&arg_pkt, &ret_pkt);	
+	printf("[clCreateContext_server_wrapper] clCall_server OK\n");
+
+        if (!svc_sendreply(transp, (xdrproc_t) xdr_ret, (char *)&ret_pkt)) {
+                svcerr_systemerr (transp);
+		exit(-1);
+        }
+	printf("[clCreateContext_server_wrapper] svc_sendreply OK\n");
+
+        if (!svc_freeargs (transp, (xdrproc_t) xdr_arg, (caddr_t) &arg_pkt)) {
+                printf ("%s", "unable to free arguments");
+                exit (-1);
+        }
+	printf("[clCreateContext_server_wrapper] svc_freeargs OK\n");
 
         return;
 
@@ -207,6 +285,15 @@ int main(){
         }
 
 	printf("[main] svctcp_register GET_DEVICE_IDS_PROG OK\n");
+
+	svc_unregister(CREATE_CONTEXT_PROG, CREATE_CONTEXT_VERS);
+
+        if (!svc_register(transp, CREATE_CONTEXT_PROG, CREATE_CONTEXT_VERS,clCreateContext_server_wrapper, IPPROTO_TCP)) {
+                printf ("%s", "unable to register (CREATE_CONTEXT_PROG, CREATE_CONTEXT_VERS, tcp).");
+                exit(-1);
+        }
+
+	printf("[main] svctcp_register CREATE_CONTEXT_PROG OK\n");
 
 	svc_run();
 
