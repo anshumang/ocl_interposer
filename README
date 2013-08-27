@@ -1,0 +1,19 @@
+The structure of the repo is this-
+--test_app.c
+--Makefile (make app to  build test_app.out)
+--client_server_common_includes.h
+--client
+  --- client.cpp
+  --- client_only_includes.h
+  --- Makefile (make client to build libCLInterposerClient.so.1.0.1)
+--server
+  ---server.cpp
+  ---Makefile (make server to build server.out)
+
+RUN HOWTO (Only shiva tested)
+----------------------------
+Launch ./server.out on shiva or ifrit
+Export LD_PRELOAD on the client machine (shiva or ifrit) to point to libCLInterposerClient.so.1.0.1
+Launch ./test_app.out on the client machine (shiva or ifrit)
+
+The dependency on shiva or ifrit is the hardcoded paths in the Makefiles for where the Nvidia tools are installed.
