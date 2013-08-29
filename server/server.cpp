@@ -242,6 +242,75 @@ void clCreateContext_server_wrapper(struct svc_req *rqstp, register SVCXPRT *tra
         return;
 
 }
+
+void clCreateCommandQueue_server(create_command_queue_ *argp, create_command_queue_ *retp){
+
+	cl_int err = CL_SUCCESS;
+
+        cl_command_queue command_queue = 0;
+
+        printf("[clCreateCommandQueue_server] context %p\n", argp->context);
+        printf("[clCreateCommandQueue_server] device %p\n", argp->device);
+
+        command_queue  = clCreateCommandQueue((cl_context)(argp->context), (cl_device_id)(argp->device), 0, &err);
+
+        if(err != CL_SUCCESS){
+                printf("clCreateCommandQueue failed with err %d\n", err);
+                exit(-1);
+        }
+	retp->err = err;
+
+	retp->command_queue = (unsigned long)command_queue;
+        printf("[clCreateCommandQueue_server] command_queue created %p\n", retp->command_queue);
+
+}
+
+void clCreateCommandQueue_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_create_command_queue;
+	xdr_ret = (xdrproc_t)_xdr_create_command_queue;
+
+	create_command_queue_ arg_pkt, ret_pkt;
+
+	memset((char *)&arg_pkt, 0, sizeof(create_command_queue_));
+	memset((char *)&ret_pkt, 0, sizeof(create_command_queue_));
+
+	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
+		svcerr_decode(transp);
+		exit(-1);
+	}
+	printf("[clCreateCommandQueue_server_wrapper] svc_getargs OK\n");
+
+	clCreateCommandQueue_server(&arg_pkt, &ret_pkt);	
+	printf("[clCreateCommandQueue_server_wrapper] clCall_server OK\n");
+
+        if (!svc_sendreply(transp, (xdrproc_t) xdr_ret, (char *)&ret_pkt)) {
+                svcerr_systemerr (transp);
+		exit(-1);
+        }
+	printf("[clCreateCommandQueue_server_wrapper] svc_sendreply OK\n");
+
+        if (!svc_freeargs (transp, (xdrproc_t) xdr_arg, (caddr_t) &arg_pkt)) {
+                printf ("%s", "unable to free arguments");
+                exit (-1);
+        }
+	printf("[clCreateCommandQueue_server_wrapper] svc_freeargs OK\n");
+
+        return;
+
+}
+int main(){
+
+        SVCXPRT *transp;
+
+	int sock;
+
+       /* Create the socket. */
+       /*sock = socket (PF_INET, SOCK_STREAM, 0);
+       if (sock < 0)
+       {
 int main(){
 
         SVCXPRT *transp;
@@ -294,6 +363,15 @@ int main(){
         }
 
 	printf("[main] svctcp_register CREATE_CONTEXT_PROG OK\n");
+
+	svc_unregister(CREATE_COMMAND_QUEUE_PROG, CREATE_COMMAND_QUEUE_VERS);
+
+        if (!svc_register(transp, CREATE_COMMAND_QUEUE_PROG, CREATE_COMMAND_QUEUE_VERS,clCreateCommandQueue_server_wrapper, IPPROTO_TCP)) {
+                printf ("%s", "unable to register (CREATE_COMMAND_QUEUE_PROG, CREATE_COMMAND_QUEUE_VERS, tcp).");
+                exit(-1);
+        }
+
+	printf("[main] svctcp_register CREATE_COMMAND_QUEUE_PROG OK\n");
 
 	svc_run();
 

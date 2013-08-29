@@ -16,12 +16,19 @@ typedef struct cl_device_id_distr {
 
 typedef struct cl_context_distr_elem {
 	char *node;
-	cl_context cl_handle;
+	cl_context clhandle;
 } cl_context_elem_;
 
 typedef struct cl_context_distr {
 
-	cl_context_elem_ *context_tuples;
+	cl_context_elem_ **context_tuples;
 	unsigned int num_context_tuples;
 
 } cl_context_;
+
+typedef struct cl_command_queue_distr {
+
+	char *node;
+	cl_command_queue clhandle;
+
+} cl_command_queue_;

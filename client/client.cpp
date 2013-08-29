@@ -309,38 +309,13 @@ cl_context clCreateContext (const cl_context_properties *properties,cl_uint num_
 	printf("[clCreateContext interposed] num_context_tuples %d\n", num_context_tuples);
 
 	cl_context_ *context_distr = (cl_context_ *)malloc(sizeof(cl_context_));
-	context_distr->context_tuples = (cl_context_elem_ *)malloc(sizeof(cl_context_elem_)*num_context_tuples);
+	context_distr->context_tuples = (cl_context_elem_ **)malloc(sizeof(cl_context_elem_*)*num_context_tuples);
 	context_distr->num_context_tuples = num_context_tuples;
 
 	int tuple_counter = 0;
 	for(std::map <char *, std::vector<cl_device_id> >::iterator it=devicevector_per_node.begin();
 		it != devicevector_per_node.end();
 		it++ ){
-
-		register CLIENT *clnt;
-		int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
-		struct hostent *hp;
-		struct sockaddr_in server_addr;
-
-		char *curr_node = it->first;
-		/* get the internet address of RPC server */
-		if ((hp = gethostbyname(curr_node)) == NULL){
-			printf("Can't get address for %s\n",curr_node);
-			exit (-1);
-		}
-
-		bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
-		server_addr.sin_family = AF_INET;
-		server_addr.sin_port = 0;
-
-		/* create TCP handle */
-		if ((clnt = clnttcp_create(&server_addr, CREATE_CONTEXT_PROG, CREATE_CONTEXT_VERS,
-						&sock, 0, 0)) == NULL){
-			clnt_pcreateerror("clnttcp_create");
-			exit(-1);
-		}
-
-		printf("[clCreateContext interposed]clnttcp_create OK\n");
 
 		xdrproc_t xdr_arg, xdr_ret;
 
@@ -372,6 +347,30 @@ cl_context clCreateContext (const cl_context_properties *properties,cl_uint num_
 		arg_pkt.devices.buff_len = sizeof(cl_device_id)*device_count;
 
 		ret_pkt.devices.buff_ptr = NULL;
+		char *curr_node = it->first;
+
+		register CLIENT *clnt;
+		int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+		struct hostent *hp;
+		struct sockaddr_in server_addr;
+
+		/* get the internet address of RPC server */
+		if ((hp = gethostbyname(curr_node)) == NULL){
+			printf("Can't get address for %s\n",curr_node);
+			exit (-1);
+		}
+
+		bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+		server_addr.sin_family = AF_INET;
+		server_addr.sin_port = 0;
+
+		/* create TCP handle */
+		if ((clnt = clnttcp_create(&server_addr, CREATE_CONTEXT_PROG, CREATE_CONTEXT_VERS,
+						&sock, 0, 0)) == NULL){
+			clnt_pcreateerror("clnttcp_create");
+			exit(-1);
+		}
+		printf("[clCreateContext interposed]clnttcp_create OK\n");
 
 		enum clnt_stat cs;
 		struct timeval  total_timeout;
@@ -382,25 +381,106 @@ cl_context clCreateContext (const cl_context_properties *properties,cl_uint num_
 		if ( cs != RPC_SUCCESS){
 			printf("clnt_call failed \n");
 		}
+		printf("[clCreateContext interposed]clnt_call OK\n");
 
-		err |= ret_pkt.err;
+		context_distr->context_tuples[tuple_counter] = (cl_context_elem_*)malloc(sizeof(cl_context_elem_));
+		context_distr->context_tuples[tuple_counter]->clhandle = (cl_context)(ret_pkt.context);
+		context_distr->context_tuples[tuple_counter]->node = curr_node;
 
-		context_distr->context_tuples[tuple_counter++].node = curr_node;
-		context_distr->context_tuples[tuple_counter++].cl_handle = (cl_context)(ret_pkt.context);
+		tuple_counter++;
+
 		printf("[clCreateContext interposed] context returned %p\n", ret_pkt.context);
+		err |= ret_pkt.err;
 
 	}
 
 	*errcode_ret = err;
+	
 	return (cl_context)context_distr;
 }
 
 cl_command_queue clCreateCommandQueue (cl_context context, cl_device_id device,cl_command_queue_properties properties,cl_int *errcode_ret){
 
-	cl_command_queue command_queue = 0;
+	char *context_node;
 
-	*errcode_ret = CL_SUCCESS;
-	return command_queue;
+	cl_device_id_ *device_distr = (cl_device_id_ *)device;
+	char *device_node = device_distr->node;
+	cl_device_id device_clhandle = device_distr->clhandle;
+
+	cl_context_ *context_distr = (cl_context_ *)context;
+
+	int node_match_index = 0;
+	for(int i=0; i<context_distr->num_context_tuples; i++){
+
+		context_node = context_distr->context_tuples[i]->node;
+
+		if(context_node != device_node){
+			continue;
+		}
+
+		node_match_index = i;
+		break;
+
+	}
+
+	cl_context context_clhandle = context_distr->context_tuples[node_match_index]->clhandle;
+
+	register CLIENT *clnt;
+	int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+	struct hostent *hp;
+	struct sockaddr_in server_addr;
+
+	assert(device_node == context_node);
+
+	/* get the internet address of RPC server */
+	if ((hp = gethostbyname(device_node)) == NULL){
+		printf("Can't get address for %s\n",device_node);
+		exit (-1);
+	}
+
+	bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = 0;
+
+	/* create TCP handle */
+	if ((clnt = clnttcp_create(&server_addr, CREATE_COMMAND_QUEUE_PROG, CREATE_COMMAND_QUEUE_VERS,
+					&sock, 0, 0)) == NULL){
+		clnt_pcreateerror("clnttcp_create");
+		exit(-1);
+	}
+
+	printf("[clCreateCommandQueue interposed]clnttcp_create OK\n");
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_create_command_queue;
+	xdr_ret = (xdrproc_t)_xdr_create_command_queue;
+
+	create_command_queue_ arg_pkt, ret_pkt;
+	memset((char *)&arg_pkt, 0, sizeof(create_command_queue_));
+	memset((char *)&ret_pkt, 0, sizeof(create_command_queue_));
+
+	arg_pkt.context = (unsigned long)context_clhandle;
+	arg_pkt.device = (unsigned long)device_clhandle;
+
+	enum clnt_stat cs;
+	struct timeval  total_timeout;
+	total_timeout.tv_sec = 10;
+	total_timeout.tv_usec = 0;
+
+	cs=clnt_call(clnt, CREATE_COMMAND_QUEUE, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+	if ( cs != RPC_SUCCESS){
+		printf("clnt_call failed \n");
+	}
+
+	printf("[clCreateCommandQueue interposed] command queue returned %p\n", ret_pkt.command_queue);
+
+	cl_command_queue_ *command_queue_distr = (cl_command_queue_ *)malloc(sizeof(cl_command_queue_));
+	command_queue_distr->clhandle = (cl_command_queue)(ret_pkt.command_queue);
+	command_queue_distr->node = device_node;
+	*errcode_ret = ret_pkt.err;
+	return (cl_command_queue)command_queue_distr;
+
 }
 
 cl_mem clCreateBuffer (cl_context context, cl_mem_flags flags, size_t size, void *host_ptr, cl_int *errcode_ret){

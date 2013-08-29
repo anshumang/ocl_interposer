@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "CL/opencl.h"
 //#include "client.h"
+#include <netdb.h> //For debugging gethostbyname()
 
 int main(){
 
@@ -59,8 +60,9 @@ int main(){
 					exit(-1);
 				}
 
-				for(i=0; i<num_devices; i++){
-					printf("[main] Device[%d] %p\n", i, devices[i]);
+				int j;
+				for(j=0; j<num_devices; j++){
+					printf("[main] Device[%d] %p\n", j, devices[j]);
 				}
 
 
@@ -74,12 +76,11 @@ int main(){
 				
 				printf("[main] Context %p\n", ctx);
 
-				int j;
-
 				cl_command_queue cmd_q[num_devices];
 
 				for(j=0; j<num_devices; j++){
 
+					printf("[main] Calling clCreateCommandQueue...\n");
 					cmd_q[j] = clCreateCommandQueue(ctx, devices[j], 0, &err);
 
 					if(err != CL_SUCCESS){
