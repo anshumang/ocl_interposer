@@ -33,6 +33,22 @@ cl_int clGetPlatformIDs (cl_uint num_entries, cl_platform_id *platforms, cl_uint
 
 	for(int i=0; i<num_nodes; i++){
 
+		xdrproc_t xdr_arg, xdr_ret;
+
+		xdr_arg = (xdrproc_t)_xdr_get_platform_ids;
+		xdr_ret = (xdrproc_t)_xdr_get_platform_ids;
+
+		get_platform_ids_ arg_pkt, ret_pkt;
+		memset((char *)&arg_pkt, 0, sizeof(get_platform_ids_));
+		memset((char *)&ret_pkt, 0, sizeof(get_platform_ids_));
+		
+		//Client receives this from the server - so this is a hack to keep the rpc libray from crashing
+		//send one char , that is, pass an initialized pointer, which gets ignored
+		arg_pkt.platforms.buff_ptr = "\0";
+		arg_pkt.platforms.buff_len = sizeof(char);
+
+		ret_pkt.platforms.buff_ptr = NULL;
+
 		register CLIENT *clnt;
 		int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
 		struct hostent *hp;
@@ -56,21 +72,6 @@ cl_int clGetPlatformIDs (cl_uint num_entries, cl_platform_id *platforms, cl_uint
    		}
 		printf("[clGetPlatformIDs interposed]clnttcp_create OK\n");
 
-		xdrproc_t xdr_arg, xdr_ret;
-
-		xdr_arg = (xdrproc_t)_xdr_get_platform_ids;
-		xdr_ret = (xdrproc_t)_xdr_get_platform_ids;
-
-		get_platform_ids_ arg_pkt, ret_pkt;
-		memset((char *)&arg_pkt, 0, sizeof(get_platform_ids_));
-		memset((char *)&ret_pkt, 0, sizeof(get_platform_ids_));
-		
-		//Client receives this from the server - so this is a hack to keep the rpc libray from crashing
-		//send one char , that is, pass an initialized pointer, which gets ignored
-		arg_pkt.platforms.buff_ptr = "\0";
-		arg_pkt.platforms.buff_len = sizeof(char);
-
-		ret_pkt.platforms.buff_ptr = NULL;
 
 		enum clnt_stat cs;
 		struct timeval  total_timeout;
@@ -164,6 +165,28 @@ cl_int clGetDeviceIDs (cl_platform_id platform,cl_device_type device_type, cl_ui
 	char *node = platform_distr->node;
 	cl_platform_id clhandle = platform_distr->clhandle;
 	
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_get_device_ids;
+	xdr_ret = (xdrproc_t)_xdr_get_device_ids;
+
+	get_device_ids_ arg_pkt, ret_pkt;
+	memset((char *)&arg_pkt, 0, sizeof(get_device_ids_));
+	memset((char *)&ret_pkt, 0, sizeof(get_device_ids_));
+		
+	//Client receives this from the server - so this is a hack to keep the rpc libray from crashing
+	//send one char , that is, pass an initialized pointer, which gets ignored
+	arg_pkt.devices.buff_ptr = "\0";
+	arg_pkt.devices.buff_len = sizeof(char);
+
+	ret_pkt.devices.buff_ptr = NULL;
+
+	arg_pkt.platform = (unsigned long)clhandle;
+	arg_pkt.device_type = (int)device_type;
+
+        printf("[clGetDeviceIDs interposed] platform %p\n", (cl_platform_id)(arg_pkt.platform));
+        printf("[clGetDeviceIDs interposed] device_type %d\n", (cl_device_type)(arg_pkt.device_type));
+
 	register CLIENT *clnt;
 	int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
 	struct hostent *hp;
@@ -187,28 +210,6 @@ cl_int clGetDeviceIDs (cl_platform_id platform,cl_device_type device_type, cl_ui
 	}
 
 	printf("[clGetDeviceIDs interposed]clnttcp_create OK\n");
-
-	xdrproc_t xdr_arg, xdr_ret;
-
-	xdr_arg = (xdrproc_t)_xdr_get_device_ids;
-	xdr_ret = (xdrproc_t)_xdr_get_device_ids;
-
-	get_device_ids_ arg_pkt, ret_pkt;
-	memset((char *)&arg_pkt, 0, sizeof(get_device_ids_));
-	memset((char *)&ret_pkt, 0, sizeof(get_device_ids_));
-		
-	//Client receives this from the server - so this is a hack to keep the rpc libray from crashing
-	//send one char , that is, pass an initialized pointer, which gets ignored
-	arg_pkt.devices.buff_ptr = "\0";
-	arg_pkt.devices.buff_len = sizeof(char);
-
-	ret_pkt.devices.buff_ptr = NULL;
-
-	arg_pkt.platform = (unsigned long)clhandle;
-	arg_pkt.device_type = (int)device_type;
-
-        printf("[clGetDeviceIDs interposed] platform %p\n", (cl_platform_id)(arg_pkt.platform));
-        printf("[clGetDeviceIDs interposed] device_type %d\n", (cl_device_type)(arg_pkt.device_type));
 
 	enum clnt_stat cs;
 	struct timeval  total_timeout;
@@ -423,14 +424,26 @@ cl_command_queue clCreateCommandQueue (cl_context context, cl_device_id device,c
 
 	}
 
+	assert(device_node == context_node);
+
 	cl_context context_clhandle = context_distr->context_tuples[node_match_index]->clhandle;
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_create_command_queue;
+	xdr_ret = (xdrproc_t)_xdr_create_command_queue;
+
+	create_command_queue_ arg_pkt, ret_pkt;
+	memset((char *)&arg_pkt, 0, sizeof(create_command_queue_));
+	memset((char *)&ret_pkt, 0, sizeof(create_command_queue_));
+
+	arg_pkt.context = (unsigned long)context_clhandle;
+	arg_pkt.device = (unsigned long)device_clhandle;
 
 	register CLIENT *clnt;
 	int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
 	struct hostent *hp;
 	struct sockaddr_in server_addr;
-
-	assert(device_node == context_node);
 
 	/* get the internet address of RPC server */
 	if ((hp = gethostbyname(device_node)) == NULL){
@@ -450,18 +463,6 @@ cl_command_queue clCreateCommandQueue (cl_context context, cl_device_id device,c
 	}
 
 	printf("[clCreateCommandQueue interposed]clnttcp_create OK\n");
-
-	xdrproc_t xdr_arg, xdr_ret;
-
-	xdr_arg = (xdrproc_t)_xdr_create_command_queue;
-	xdr_ret = (xdrproc_t)_xdr_create_command_queue;
-
-	create_command_queue_ arg_pkt, ret_pkt;
-	memset((char *)&arg_pkt, 0, sizeof(create_command_queue_));
-	memset((char *)&ret_pkt, 0, sizeof(create_command_queue_));
-
-	arg_pkt.context = (unsigned long)context_clhandle;
-	arg_pkt.device = (unsigned long)device_clhandle;
 
 	enum clnt_stat cs;
 	struct timeval  total_timeout;
