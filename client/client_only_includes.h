@@ -21,7 +21,7 @@ typedef struct cl_context_distr_elem {
 
 typedef struct cl_context_distr {
 
-	cl_context_elem_ **context_tuples;
+	cl_context_elem_ *context_tuples;
 	unsigned int num_context_tuples;
 
 } cl_context_;
@@ -32,3 +32,15 @@ typedef struct cl_command_queue_distr {
 	cl_command_queue clhandle;
 
 } cl_command_queue_;
+
+typedef struct cl_mem_distr_elem {
+	char *node;
+	cl_mem clhandle;
+} cl_mem_elem_;
+
+typedef struct cl_mem_distr {
+
+	cl_mem_elem_ *mem_tuples;
+	unsigned int num_mem_tuples;
+
+} cl_mem_;

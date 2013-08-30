@@ -91,6 +91,20 @@ int main(){
 					printf("[main] Command Queue[%d] %p\n", j, cmd_q[j]);
 
 				}
+
+				size_t size = 1024*1024;
+
+				void *host_ptr = malloc(size);
+
+				cl_mem mem;
+
+				//mem = clCreateBuffer(ctx, CL_MEM_ALLOC_HOST_PTR, size, NULL, &err);
+				//mem = clCreateBuffer(ctx, CL_MEM_COPY_HOST_PTR, size, host_ptr, &err);
+				mem = clCreateBuffer(ctx, CL_MEM_USE_HOST_PTR, size, host_ptr, &err);
+				if(err != CL_SUCCESS){
+                                        printf("clCreateBuffer failed with err %d\n", err);
+                                        exit(-1);
+                                }
 			}
 
 		}

@@ -310,7 +310,7 @@ cl_context clCreateContext (const cl_context_properties *properties,cl_uint num_
 	printf("[clCreateContext interposed] num_context_tuples %d\n", num_context_tuples);
 
 	cl_context_ *context_distr = (cl_context_ *)malloc(sizeof(cl_context_));
-	context_distr->context_tuples = (cl_context_elem_ **)malloc(sizeof(cl_context_elem_*)*num_context_tuples);
+	context_distr->context_tuples = (cl_context_elem_ *)malloc(sizeof(cl_context_elem_)*num_context_tuples);
 	context_distr->num_context_tuples = num_context_tuples;
 
 	int tuple_counter = 0;
@@ -384,9 +384,9 @@ cl_context clCreateContext (const cl_context_properties *properties,cl_uint num_
 		}
 		printf("[clCreateContext interposed]clnt_call OK\n");
 
-		context_distr->context_tuples[tuple_counter] = (cl_context_elem_*)malloc(sizeof(cl_context_elem_));
-		context_distr->context_tuples[tuple_counter]->clhandle = (cl_context)(ret_pkt.context);
-		context_distr->context_tuples[tuple_counter]->node = curr_node;
+		//context_distr->context_tuples[tuple_counter] = (cl_context_elem_ *)malloc(sizeof(cl_context_elem_));
+		context_distr->context_tuples[tuple_counter].clhandle = (cl_context)(ret_pkt.context);
+		context_distr->context_tuples[tuple_counter].node = curr_node;
 
 		tuple_counter++;
 
@@ -413,7 +413,7 @@ cl_command_queue clCreateCommandQueue (cl_context context, cl_device_id device,c
 	int node_match_index = 0;
 	for(int i=0; i<context_distr->num_context_tuples; i++){
 
-		context_node = context_distr->context_tuples[i]->node;
+		context_node = context_distr->context_tuples[i].node;
 
 		if(context_node != device_node){
 			continue;
@@ -426,7 +426,7 @@ cl_command_queue clCreateCommandQueue (cl_context context, cl_device_id device,c
 
 	assert(device_node == context_node);
 
-	cl_context context_clhandle = context_distr->context_tuples[node_match_index]->clhandle;
+	cl_context context_clhandle = context_distr->context_tuples[node_match_index].clhandle;
 
 	xdrproc_t xdr_arg, xdr_ret;
 
@@ -486,10 +486,92 @@ cl_command_queue clCreateCommandQueue (cl_context context, cl_device_id device,c
 
 cl_mem clCreateBuffer (cl_context context, cl_mem_flags flags, size_t size, void *host_ptr, cl_int *errcode_ret){
 
-	cl_mem buffer = 0;
+	cl_int err = CL_SUCCESS;
 
-	*errcode_ret = CL_SUCCESS;
-	return buffer;
+	cl_context_ *context_distr = (cl_context_ *)context;
+	int num_tuples = context_distr->num_context_tuples;
+
+	cl_mem_ *mem_distr = (cl_mem_ *)malloc(sizeof(cl_mem_));
+	mem_distr->mem_tuples = (cl_mem_elem_ *)malloc(num_tuples * sizeof(cl_mem_elem_));
+
+	bool send_data = flags & CL_MEM_COPY_HOST_PTR;
+
+	for(int i=0; i<context_distr->num_context_tuples; i++){
+
+		char *node = context_distr->context_tuples[i].node;
+		printf("[clCreateBuffer interposed] node %s\n", node);
+
+		cl_context context_clhandle = context_distr->context_tuples[i].clhandle;
+		printf("[clCreateBuffer interposed] context %p\n", context_clhandle);
+
+		xdrproc_t xdr_arg, xdr_ret;
+
+		xdr_arg = (xdrproc_t)_xdr_create_buffer;
+		xdr_ret = (xdrproc_t)_xdr_create_buffer;
+
+		create_buffer_ arg_pkt, ret_pkt;
+		memset((char *)&arg_pkt, 0, sizeof(create_buffer_));
+		memset((char *)&ret_pkt, 0, sizeof(create_buffer_));
+
+		arg_pkt.context = (unsigned long)context_clhandle;
+		arg_pkt.flags = flags;
+		arg_pkt.size = size;
+
+		if(send_data){
+			assert(host_ptr != NULL);
+			arg_pkt.data.buff_ptr = (char *)host_ptr;
+			arg_pkt.data.buff_len = size;
+		} else {
+			arg_pkt.data.buff_ptr = "\0";
+			arg_pkt.data.buff_len = sizeof(char);
+		}
+
+		ret_pkt.data.buff_ptr = NULL;
+
+		register CLIENT *clnt;
+		int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+		struct hostent *hp;
+		struct sockaddr_in server_addr;
+
+		/* get the internet address of RPC server */
+		if ((hp = gethostbyname(node)) == NULL){
+			printf("Can't get address for %s\n", node);
+			exit (-1);
+		}
+
+		bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+		server_addr.sin_family = AF_INET;
+		server_addr.sin_port = 0;
+
+		/* create TCP handle */
+		if ((clnt = clnttcp_create(&server_addr, CREATE_BUFFER_PROG, CREATE_BUFFER_VERS,
+						&sock, 0, 0)) == NULL){
+			clnt_pcreateerror("clnttcp_create");
+			exit(-1);
+		}
+
+		printf("[clCreateBuffer interposed]clnttcp_create OK\n");
+
+		enum clnt_stat cs;
+		struct timeval  total_timeout;
+		total_timeout.tv_sec = 10;
+		total_timeout.tv_usec = 0;
+
+		cs=clnt_call(clnt, CREATE_BUFFER, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+		if ( cs != RPC_SUCCESS){
+			printf("clnt_call failed \n");
+		}
+
+		printf("[clCreateBuffer interposed] mem returned %p\n", ret_pkt.mem);
+
+		mem_distr->mem_tuples[i].clhandle = (cl_mem)(ret_pkt.mem);
+		mem_distr->mem_tuples[i].node = node;
+		err |= ret_pkt.err;
+
+	}
+
+	*errcode_ret = err;
+	return (cl_mem)mem_distr;
 }
 
 cl_program clCreateProgramWithSource (cl_context context, cl_uint count, const char **strings,const size_t *lengths, cl_int *errcode_ret){

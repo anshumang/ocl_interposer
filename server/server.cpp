@@ -301,6 +301,83 @@ void clCreateCommandQueue_server_wrapper(struct svc_req *rqstp, register SVCXPRT
         return;
 
 }
+
+void clCreateBuffer_server(create_buffer_ *argp, create_buffer_ *retp){
+
+	cl_int err = CL_SUCCESS;
+
+        cl_mem mem = 0;
+
+        printf("[clCreateBuffer_server] context %p\n", argp->context);
+
+	cl_mem_flags flags = (cl_mem_flags)(argp->flags);
+	size_t size = (size_t)(argp->size);
+	void *host_ptr = NULL;
+
+	bool use_host_ptr = flags & CL_MEM_USE_HOST_PTR;
+
+	bool copy_host_ptr = flags & CL_MEM_COPY_HOST_PTR;
+
+	if(use_host_ptr){
+		host_ptr = malloc(size);
+	} else if (copy_host_ptr) {
+		host_ptr = (void *)(argp->data.buff_ptr);
+	}
+        mem  = clCreateBuffer((cl_context)(argp->context), flags, size, host_ptr, &err);
+
+        if(err != CL_SUCCESS){
+                printf("clCreateBuffer failed with err %d\n", err);
+                exit(-1);
+        }
+	retp->err = err;
+
+	retp->data.buff_ptr = "\0";
+	retp->data.buff_len = sizeof(char);	
+
+	retp->mem = (unsigned long)mem;
+
+        printf("[clCreateBuffer_server] mem created %p\n", retp->mem);
+
+}
+
+void clCreateBuffer_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_create_buffer;
+	xdr_ret = (xdrproc_t)_xdr_create_buffer;
+
+	create_buffer_ arg_pkt, ret_pkt;
+
+	memset((char *)&arg_pkt, 0, sizeof(create_buffer_));
+	memset((char *)&ret_pkt, 0, sizeof(create_buffer_));
+
+	arg_pkt.data.buff_ptr = NULL;
+
+	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
+		svcerr_decode(transp);
+		exit(-1);
+	}
+	printf("[clCreateBuffer_server_wrapper] svc_getargs OK\n");
+
+	clCreateBuffer_server(&arg_pkt, &ret_pkt);	
+	printf("[clCreateBuffer_server_wrapper] clCall_server OK\n");
+
+        if (!svc_sendreply(transp, (xdrproc_t) xdr_ret, (char *)&ret_pkt)) {
+                svcerr_systemerr (transp);
+		exit(-1);
+        }
+	printf("[clCreateBuffer_server_wrapper] svc_sendreply OK\n");
+
+        if (!svc_freeargs (transp, (xdrproc_t) xdr_arg, (caddr_t) &arg_pkt)) {
+                printf ("%s", "unable to free arguments");
+                exit (-1);
+        }
+	printf("[clCreateBuffer_server_wrapper] svc_freeargs OK\n");
+
+        return;
+
+}
 int main(){
 
         SVCXPRT *transp;
@@ -372,6 +449,15 @@ int main(){
         }
 
 	printf("[main] svctcp_register CREATE_COMMAND_QUEUE_PROG OK\n");
+
+	svc_unregister(CREATE_BUFFER_PROG, CREATE_BUFFER_VERS);
+
+        if (!svc_register(transp, CREATE_BUFFER_PROG, CREATE_BUFFER_VERS,clCreateBuffer_server_wrapper, IPPROTO_TCP)) {
+                printf ("%s", "unable to register (CREATE_BUFFER_PROG, CREATE_BUFFER_VERS, tcp).");
+                exit(-1);
+        }
+
+	printf("[main] svctcp_register CREATE_BUFFER_PROG OK\n");
 
 	svc_run();
 

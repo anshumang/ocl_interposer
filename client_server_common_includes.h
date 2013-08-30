@@ -1,18 +1,50 @@
-#define GET_PLATFORM_IDS_PROG 0x30000000
+#define GET_PLATFORM_IDS_PROG 0xE1000000
 #define GET_PLATFORM_IDS_VERS 1
 #define GET_PLATFORM_IDS 0x1
 
-#define GET_DEVICE_IDS_PROG 0x03000000
+#define GET_DEVICE_IDS_PROG 0x0E100000
 #define GET_DEVICE_IDS_VERS 1
 #define GET_DEVICE_IDS 0x2
 
-#define CREATE_CONTEXT_PROG 0x00300000
+#define CREATE_CONTEXT_PROG 0x00E10000
 #define CREATE_CONTEXT_VERS 1
 #define CREATE_CONTEXT 0x3
 
-#define CREATE_COMMAND_QUEUE_PROG 0x00030000
+#define CREATE_COMMAND_QUEUE_PROG 0x000E1000
 #define CREATE_COMMAND_QUEUE_VERS 1
 #define CREATE_COMMAND_QUEUE 0x4
+
+#define CREATE_BUFFER_PROG 0x0000E100
+#define CREATE_BUFFER_VERS 1
+#define CREATE_BUFFER 0x5
+
+#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00000400
+#define CREATE_PROGRAM_WITH_SOURCE_VERS 1
+#define CREATE_PROGRAM_WITH_SOURCE 0x6
+
+#define BUILD_PROGRAM_PROG 0x00000040
+#define BUILD_PROGRAM_VERS 1
+#define BUILD_PROGRAM 0x7
+
+#define CREATE_KERNEL_PROG 0x00000004
+#define CREATE_KERNEL_VERS 1
+#define CREATE_KERNEL 0x8
+
+#define SET_KERNEL_ARG_PROG 0x10000004
+#define SET_KERNEL_ARG_VERS 1
+#define SET_KERNEL_ARG 0x9
+
+#define ENQUEUE_READ_BUFFER_PROG 0x01000004
+#define ENQUEUE_READ_BUFFER_VERS 1
+#define ENQUEUE_READ_BUFFER 0xA
+
+#define ENQUEUE_WRITE_BUFFER_PROG 0x00100004
+#define ENQUEUE_WRITE_BUFFER_VERS 1
+#define ENQUEUE_WRITE_BUFFER 0xB
+
+#define ENQUEUE_NDRANGE_KERNEL_PROG 0x00010004
+#define ENQUEUE_NDRANGE_KERNEL_VERS 1
+#define ENQUEUE_NDRANGE_KERNEL 0xC
 
 typedef struct buff_xdr {
 	unsigned int buff_len;
@@ -165,6 +197,13 @@ typedef struct create_command_queue_xdr {
 
 bool_t _xdr_create_command_queue(XDR *xdrs, create_command_queue_ *objp){
 
+#ifdef XDR_DEBUG
+	if(xdrs->x_op == XDR_ENCODE){
+		printf("[_xdr_create_command_queue] xdr encode\n");
+		printf("[_xdr_create_command_queue] context %p\n", objp->context);
+	}
+#endif
+
 	if(!xdr_u_long(xdrs, &(objp->context))){
 		return FALSE;
 	}
@@ -180,6 +219,65 @@ bool_t _xdr_create_command_queue(XDR *xdrs, create_command_queue_ *objp){
 	if(!xdr_int(xdrs, &(objp->err))){
 		return FALSE;
 	}
+
+#ifdef XDR_DEBUG
+	if(xdrs->x_op == XDR_DECODE){
+		printf("[_xdr_create_command_queue] xdr decode\n");
+		printf("[_xdr_create_command_queue] context %p\n", objp->context);
+	}
+#endif
+
+	return TRUE;
+}
+
+typedef struct create_buffer_xdr {
+	unsigned long context; //Client to Server
+	int flags; //C2S
+	buff_xdr_ data; //C2S
+	unsigned long size; //C2S
+	int err; //Server to Client
+	unsigned long mem; //S2C
+} create_buffer_;
+
+bool_t _xdr_create_buffer(XDR *xdrs, create_buffer_ *objp){
+
+#ifdef XDR_DEBUG
+	if(xdrs->x_op == XDR_ENCODE){
+		printf("[_xdr_create_buffer] xdr encode\n");
+		printf("[_xdr_create_buffer] context %p\n", objp->context);
+	}
+#endif
+
+	if(!xdr_u_long(xdrs, &(objp->context))){
+		return FALSE;
+	}
+
+	if(!xdr_int(xdrs, &(objp->flags))){
+		return FALSE;
+	}
+
+        if(!xdr_u_long(xdrs, &(objp->size))){
+                return FALSE;
+        }
+
+	if (!xdr_bytes (xdrs, (char **)&objp->data.buff_ptr, (u_int *) &objp->data.buff_len, ~0)){
+		return FALSE;
+	}
+
+	if(!xdr_u_long(xdrs, &(objp->mem))){
+		return FALSE;
+	}
+
+	if(!xdr_int(xdrs, &(objp->err))){
+		return FALSE;
+	}
+
+#ifdef XDR_DEBUG
+	if(xdrs->x_op == XDR_DECODE){
+		printf("[_xdr_create_buffer] xdr decode\n");
+		printf("[_xdr_create_buffer] context %p\n", objp->context);
+	}
+#endif
 
 	return TRUE;
 }
