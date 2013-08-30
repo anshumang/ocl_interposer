@@ -577,6 +577,50 @@ cl_mem clCreateBuffer (cl_context context, cl_mem_flags flags, size_t size, void
 cl_program clCreateProgramWithSource (cl_context context, cl_uint count, const char **strings,const size_t *lengths, cl_int *errcode_ret){
 
 	cl_program program = 0;
+	cl_int err = CL_SUCCESS;
+
+	if(!count){
+	   *errcode_ret = CL_INVALID_VALUE;
+	   return 0;
+	}
+
+	if(!strings){
+	   *errcode_ret = CL_INVALID_VALUE;
+	   return 0;
+	}
+
+	int program_str_size = 0;
+	for(int i=0; i<count; i++){
+            const char *string = strings[i];
+            if(!string){
+		*errcode_ret = CL_INVALID_VALUE;
+                return 0;
+            }
+	    if((!lengths) || (!lengths[i])){
+		program_str_size += strlen(string);
+	    } else {
+		program_str_size += lengths[i];	
+	    }	    
+	}
+	printf("[clCreateProgramWithSource interposed] program_str_size %d\n", program_str_size);
+
+	char *program_str = (char *)malloc(program_str_size);
+	int program_str_offset = 0;
+	for(int i=0; i<count; i++){
+	    const char *string = strings[i];
+	    assert(string != NULL);
+	    if((!lengths) || (!lengths[i])){
+		strcpy(program_str + program_str_offset, string);
+		program_str_offset += strlen(string);
+	    } else {
+		char *program_str_curr = program_str + program_str_offset;
+		for(int j=0; j<lengths[i]; j++){
+			program_str_curr[j] = string[j];
+		}
+		program_str_offset += lengths[i];
+	    }
+	}
+	program_str[program_str_offset] = '\0';//Null terminate the string
 	
 	cl_context_ *context_distr = (cl_context_ *)context;
 	int num_tuples = context_distr->num_context_tuples;
@@ -602,6 +646,8 @@ cl_program clCreateProgramWithSource (cl_context context, cl_uint count, const c
 		memset((char *)&ret_pkt, 0, sizeof(create_program_with_source_));
 
 		arg_pkt.context = (unsigned long)context_clhandle;
+		arg_pkt.program_str.buff_ptr = program_str;
+		arg_pkt.program_str.buff_len = program_str_offset+1;//The extra 1 accounts for the null char
 
 		register CLIENT *clnt;
 		int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
@@ -646,7 +692,7 @@ cl_program clCreateProgramWithSource (cl_context context, cl_uint count, const c
 	}
 
 	*errcode_ret = err;
-	return (cl_mem)program_distr;
+	return (cl_program)program_distr;
 	
 	//*errcode_ret = CL_SUCCESS;
 	//return program;

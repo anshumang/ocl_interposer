@@ -44,3 +44,15 @@ typedef struct cl_mem_distr {
 	unsigned int num_mem_tuples;
 
 } cl_mem_;
+
+typedef struct cl_program_distr_elem {
+	char *node;
+	cl_program clhandle;
+} cl_program_elem_;
+
+typedef struct cl_program_distr {
+
+	cl_program_elem_ *program_tuples;
+	unsigned int num_program_tuples;
+
+} cl_program_;

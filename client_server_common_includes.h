@@ -1,24 +1,24 @@
-#define GET_PLATFORM_IDS_PROG 0xE1000000
+#define GET_PLATFORM_IDS_PROG 0xD1000000
 #define GET_PLATFORM_IDS_VERS 1
 #define GET_PLATFORM_IDS 0x1
 
-#define GET_DEVICE_IDS_PROG 0x0E100000
+#define GET_DEVICE_IDS_PROG 0x0D100000
 #define GET_DEVICE_IDS_VERS 1
 #define GET_DEVICE_IDS 0x2
 
-#define CREATE_CONTEXT_PROG 0x00E10000
+#define CREATE_CONTEXT_PROG 0x00D10000
 #define CREATE_CONTEXT_VERS 1
 #define CREATE_CONTEXT 0x3
 
-#define CREATE_COMMAND_QUEUE_PROG 0x000E1000
+#define CREATE_COMMAND_QUEUE_PROG 0x000D1000
 #define CREATE_COMMAND_QUEUE_VERS 1
 #define CREATE_COMMAND_QUEUE 0x4
 
-#define CREATE_BUFFER_PROG 0x0000E100
+#define CREATE_BUFFER_PROG 0x0000D100
 #define CREATE_BUFFER_VERS 1
 #define CREATE_BUFFER 0x5
 
-#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00000400
+#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00000100
 #define CREATE_PROGRAM_WITH_SOURCE_VERS 1
 #define CREATE_PROGRAM_WITH_SOURCE 0x6
 
@@ -276,6 +276,48 @@ bool_t _xdr_create_buffer(XDR *xdrs, create_buffer_ *objp){
 	if(xdrs->x_op == XDR_DECODE){
 		printf("[_xdr_create_buffer] xdr decode\n");
 		printf("[_xdr_create_buffer] context %p\n", objp->context);
+	}
+#endif
+
+	return TRUE;
+}
+
+typedef struct create_program_with_source_xdr {
+	unsigned long context; //Client to Server
+	buff_xdr_ program_str; //C2S
+	int err; //Server to Client
+	unsigned long program; //S2C
+} create_program_with_source_;
+
+bool_t _xdr_create_program_with_source(XDR *xdrs, create_program_with_source_ *objp){
+
+#ifdef XDR_DEBUG
+	if(xdrs->x_op == XDR_ENCODE){
+		printf("[_xdr_create_program_with_source] xdr encode\n");
+		printf("[_xdr_create_program_with_source] context %p\n", objp->context);
+	}
+#endif
+
+	if(!xdr_u_long(xdrs, &(objp->context))){
+		return FALSE;
+	}
+
+	if (!xdr_bytes (xdrs, (char **)&objp->program_str.buff_ptr, (u_int *) &objp->program_str.buff_len, ~0)){
+		return FALSE;
+	}
+
+	if(!xdr_u_long(xdrs, &(objp->program))){
+		return FALSE;
+	}
+
+	if(!xdr_int(xdrs, &(objp->err))){
+		return FALSE;
+	}
+
+#ifdef XDR_DEBUG
+	if(xdrs->x_op == XDR_DECODE){
+		printf("[_xdr_create_program_with_source] xdr decode\n");
+		printf("[_xdr_create_program_with_source] context %p\n", objp->context);
 	}
 #endif
 

@@ -131,7 +131,7 @@ int main(){
                                         exit(-1);
                                 }
 				printf("[main] Program %p\n", prog);
-
+#if 0
 				err = clBuildProgram(prog, num_devices, devices, NULL, NULL, NULL);
 				if(err != CL_SUCCESS){
                                         printf("clBuildProgram failed with err %d\n", err);
@@ -228,11 +228,11 @@ int main(){
 						exit(-1);
 					}
 				}
+#endif	
 			}
 
 		}
 	}
-	
 
 	return 0;
 

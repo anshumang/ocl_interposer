@@ -378,6 +378,70 @@ void clCreateBuffer_server_wrapper(struct svc_req *rqstp, register SVCXPRT *tran
         return;
 
 }
+
+void clCreateProgramWithSource_server(create_program_with_source_ *argp, create_program_with_source_ *retp){
+
+	cl_int err = CL_SUCCESS;
+
+        cl_program program = 0;
+
+        printf("[clCreateProgramWithSource_server] context %p\n", argp->context);
+
+        program  = clCreateProgramWithSource((cl_context)(argp->context), 1, (const char **)&(argp->program_str.buff_ptr), NULL, &err);
+
+        if(err != CL_SUCCESS){
+                printf("clCreateProgramWithSource failed with err %d\n", err);
+                exit(-1);
+        }
+	retp->err = err;
+
+	retp->program_str.buff_ptr = "\0";
+	retp->program_str.buff_len = sizeof(char);	
+
+	retp->program = (unsigned long)program;
+
+        printf("[clCreateProgramWithSource_server] program created %p\n", retp->program);
+
+}
+
+void clCreateProgramWithSource_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_create_program_with_source;
+	xdr_ret = (xdrproc_t)_xdr_create_program_with_source;
+
+	create_program_with_source_ arg_pkt, ret_pkt;
+
+	memset((char *)&arg_pkt, 0, sizeof(create_program_with_source_));
+	memset((char *)&ret_pkt, 0, sizeof(create_program_with_source_));
+
+	arg_pkt.program_str.buff_ptr = NULL;
+
+	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
+		svcerr_decode(transp);
+		exit(-1);
+	}
+	printf("[clCreateProgramWithSource_server_wrapper] svc_getargs OK\n");
+
+	clCreateProgramWithSource_server(&arg_pkt, &ret_pkt);
+	printf("[clCreateProgramWithSource_server_wrapper] clCall_server OK\n");
+
+        if (!svc_sendreply(transp, (xdrproc_t) xdr_ret, (char *)&ret_pkt)) {
+                svcerr_systemerr (transp);
+		exit(-1);
+        }
+	printf("[clCreateProgramWithSource_server_wrapper] svc_sendreply OK\n");
+
+        if (!svc_freeargs (transp, (xdrproc_t) xdr_arg, (caddr_t) &arg_pkt)) {
+                printf ("%s", "unable to free arguments");
+                exit (-1);
+        }
+	printf("[clCreateProgramWithSource_server_wrapper] svc_freeargs OK\n");
+
+        return;
+}
+
 int main(){
 
         SVCXPRT *transp;
@@ -388,18 +452,8 @@ int main(){
        /*sock = socket (PF_INET, SOCK_STREAM, 0);
        if (sock < 0)
        {
-int main(){
-
-        SVCXPRT *transp;
-
-	int sock;
-
-       /* Create the socket. */
-       /*sock = socket (PF_INET, SOCK_STREAM, 0);
-       if (sock < 0)
-       {
-	       perror ("socket");
-	       exit (EXIT_FAILURE);
+       	perror ("socket");
+       	exit (EXIT_FAILURE);
        }*/
 
 
@@ -458,6 +512,15 @@ int main(){
         }
 
 	printf("[main] svctcp_register CREATE_BUFFER_PROG OK\n");
+
+	svc_unregister(CREATE_PROGRAM_WITH_SOURCE_PROG, CREATE_PROGRAM_WITH_SOURCE_VERS);
+
+        if (!svc_register(transp, CREATE_PROGRAM_WITH_SOURCE_PROG, CREATE_PROGRAM_WITH_SOURCE_VERS,clCreateProgramWithSource_server_wrapper, IPPROTO_TCP)) {
+                printf ("%s", "unable to register (CREATE_PROGRAM_WITH_SOURCE_PROG, CREATE_PROGRAM_WITH_SOURCE_VERS, tcp).");
+                exit(-1);
+        }
+
+	printf("[main] svctcp_register CREATE_PROGRAM_WITH_SOURCE_PROG OK\n");
 
 	svc_run();
 
