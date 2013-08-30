@@ -442,6 +442,70 @@ void clCreateProgramWithSource_server_wrapper(struct svc_req *rqstp, register SV
         return;
 }
 
+void clBuildProgram_server(build_program_ *argp, build_program_ *retp){
+
+	cl_int err = CL_SUCCESS;
+
+        printf("[clBuildProgram_server] program %p\n", argp->program);
+	
+	if(argp->all_devices){
+		err  = clBuildProgram((cl_program)(argp->program), 0, NULL, (const char *)(argp->options.buff_ptr), NULL, NULL);
+	} else {
+		err  = clBuildProgram((cl_program)(argp->program), (argp->num_devices), (cl_device_id *)(argp->devices.buff_ptr), (const char *)(argp->options.buff_ptr), NULL, NULL);
+	}
+        if(err != CL_SUCCESS){
+                printf("clBuildProgram failed with err %d\n", err);
+                exit(-1);
+        }
+	retp->err = err;
+
+	retp->devices.buff_ptr = "\0";
+	retp->devices.buff_len = sizeof(char);	
+
+	retp->options.buff_ptr = "\0";
+	retp->options.buff_len = sizeof(char);	
+
+}
+
+void clBuildProgram_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_build_program;
+	xdr_ret = (xdrproc_t)_xdr_build_program;
+
+	build_program_ arg_pkt, ret_pkt;
+
+	memset((char *)&arg_pkt, 0, sizeof(build_program_));
+	memset((char *)&ret_pkt, 0, sizeof(build_program_));
+
+	arg_pkt.devices.buff_ptr = NULL;
+	arg_pkt.options.buff_ptr = NULL;
+
+	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
+		svcerr_decode(transp);
+		exit(-1);
+	}
+	printf("[clBuildProgram_server_wrapper] svc_getargs OK\n");
+
+	clBuildProgram_server(&arg_pkt, &ret_pkt);
+	printf("[clBuildProgram_server_wrapper] clCall_server OK\n");
+
+        if (!svc_sendreply(transp, (xdrproc_t) xdr_ret, (char *)&ret_pkt)) {
+                svcerr_systemerr (transp);
+		exit(-1);
+        }
+	printf("[clBuildProgram_server_wrapper] svc_sendreply OK\n");
+
+        if (!svc_freeargs (transp, (xdrproc_t) xdr_arg, (caddr_t) &arg_pkt)) {
+                printf ("%s", "unable to free arguments");
+                exit (-1);
+        }
+	printf("[clBuildProgram_server_wrapper] svc_freeargs OK\n");
+
+        return;
+}
+
 int main(){
 
         SVCXPRT *transp;
@@ -521,6 +585,15 @@ int main(){
         }
 
 	printf("[main] svctcp_register CREATE_PROGRAM_WITH_SOURCE_PROG OK\n");
+
+	svc_unregister(BUILD_PROGRAM_PROG, BUILD_PROGRAM_VERS);
+
+        if (!svc_register(transp, BUILD_PROGRAM_PROG, BUILD_PROGRAM_VERS,clBuildProgram_server_wrapper, IPPROTO_TCP)) {
+                printf ("%s", "unable to register (BUILD_PROGRAM_PROG, BUILD_PROGRAM_VERS, tcp).");
+                exit(-1);
+        }
+
+	printf("[main] svctcp_register BUILD_PROGRAM_PROG OK\n");
 
 	svc_run();
 

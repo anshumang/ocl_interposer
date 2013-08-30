@@ -1,24 +1,24 @@
-#define GET_PLATFORM_IDS_PROG 0xD1000000
+#define GET_PLATFORM_IDS_PROG 0x91000000
 #define GET_PLATFORM_IDS_VERS 1
 #define GET_PLATFORM_IDS 0x1
 
-#define GET_DEVICE_IDS_PROG 0x0D100000
+#define GET_DEVICE_IDS_PROG 0x09100000
 #define GET_DEVICE_IDS_VERS 1
 #define GET_DEVICE_IDS 0x2
 
-#define CREATE_CONTEXT_PROG 0x00D10000
+#define CREATE_CONTEXT_PROG 0x00910000
 #define CREATE_CONTEXT_VERS 1
 #define CREATE_CONTEXT 0x3
 
-#define CREATE_COMMAND_QUEUE_PROG 0x000D1000
+#define CREATE_COMMAND_QUEUE_PROG 0x00091000
 #define CREATE_COMMAND_QUEUE_VERS 1
 #define CREATE_COMMAND_QUEUE 0x4
 
-#define CREATE_BUFFER_PROG 0x0000D100
+#define CREATE_BUFFER_PROG 0x00009100
 #define CREATE_BUFFER_VERS 1
 #define CREATE_BUFFER 0x5
 
-#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00000100
+#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00000500
 #define CREATE_PROGRAM_WITH_SOURCE_VERS 1
 #define CREATE_PROGRAM_WITH_SOURCE 0x6
 
@@ -318,6 +318,58 @@ bool_t _xdr_create_program_with_source(XDR *xdrs, create_program_with_source_ *o
 	if(xdrs->x_op == XDR_DECODE){
 		printf("[_xdr_create_program_with_source] xdr decode\n");
 		printf("[_xdr_create_program_with_source] context %p\n", objp->context);
+	}
+#endif
+
+	return TRUE;
+}
+
+typedef struct build_program_xdr {
+	unsigned long program; //Client to Server
+	bool_t all_devices; //C2S
+	unsigned int num_devices; //C2S
+	buff_xdr_ devices; //C2S
+	buff_xdr_ options; //C2S
+	int err; //Server to Client
+} build_program_;
+
+bool_t _xdr_build_program(XDR *xdrs, build_program_ *objp){
+
+#ifdef XDR_DEBUG
+	if(xdrs->x_op == XDR_ENCODE){
+		printf("[_xdr_build_program] xdr encode\n");
+		printf("[_xdr_build_program] program %p\n", objp->program);
+	}
+#endif
+
+	if(!xdr_u_long(xdrs, &(objp->program))){
+		return FALSE;
+	}
+
+	if(!xdr_bool(xdrs, &(objp->all_devices))){
+		return FALSE;
+	}
+
+	if(!xdr_u_int(xdrs, &(objp->num_devices))){
+		return FALSE;
+	}
+
+	if (!xdr_bytes (xdrs, (char **)&objp->devices.buff_ptr, (u_int *) &objp->devices.buff_len, ~0)){
+		return FALSE;
+	}
+
+	if (!xdr_bytes (xdrs, (char **)&objp->options.buff_ptr, (u_int *) &objp->options.buff_len, ~0)){
+		return FALSE;
+	}
+
+	if(!xdr_int(xdrs, &(objp->err))){
+		return FALSE;
+	}
+
+#ifdef XDR_DEBUG
+	if(xdrs->x_op == XDR_DECODE){
+		printf("[_xdr_build_program] xdr decode\n");
+		printf("[_xdr_build_program] program %p\n", objp->program);
 	}
 #endif
 

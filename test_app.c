@@ -131,7 +131,7 @@ int main(){
                                         exit(-1);
                                 }
 				printf("[main] Program %p\n", prog);
-#if 0
+
 				err = clBuildProgram(prog, num_devices, devices, NULL, NULL, NULL);
 				if(err != CL_SUCCESS){
                                         printf("clBuildProgram failed with err %d\n", err);
@@ -150,6 +150,7 @@ int main(){
                                         exit(-1);
                                 }
 
+#if 0
 				cl_kernel kern;
 
 				kern = clCreateKernel(prog, "helloworld", &err);
@@ -178,7 +179,7 @@ int main(){
 					}
 					printf("CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE %ld\n", param_value);
 				}
-
+			
 				err = clSetKernelArg(kern, 0, sizeof(cl_mem), (void *)&mem_in);
 				if(err != CL_SUCCESS){
                                         printf("clSetKernelArg failed with err %d\n", err);
@@ -211,6 +212,7 @@ int main(){
 					err = clEnqueueNDRangeKernel(cmd_q[j], kern, work_dim, global_work_offset, global_work_size, local_work_size, 0, NULL, NULL);
 					if(err != CL_SUCCESS){
 						printf("clEnqueueNDRange failed with err %d\n", err);
+						printf("CL_INVALID_KERNEL_ARGS %d\n", CL_INVALID_KERNEL_ARGS);
 						exit(-1);
 					}
 

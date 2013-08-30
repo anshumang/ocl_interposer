@@ -293,12 +293,10 @@ cl_context clCreateContext (const cl_context_properties *properties,cl_uint num_
 		std::map<char *, std::vector<cl_device_id> >::iterator it = devicevector_per_node.find(node);
 
 		if(it == devicevector_per_node.end()){
-			//printf("[clCreateContext interposed] first device on the node\n");
 			std::vector<cl_device_id> devicevector;
 			devicevector.push_back(clhandle);
 			devicevector_per_node.insert(make_pair(node, devicevector));
 		} else {
-			//printf("[clCreateContext interposed] second or more device on the node\n");
 			std::vector<cl_device_id> devicevector = it->second;
 			devicevector.push_back(clhandle);
 			devicevector_per_node[node] = devicevector;
@@ -627,6 +625,7 @@ cl_program clCreateProgramWithSource (cl_context context, cl_uint count, const c
 
 	cl_program_ *program_distr = (cl_program_ *)malloc(sizeof(cl_program_));
 	program_distr->program_tuples = (cl_program_elem_ *)malloc(num_tuples * sizeof(cl_program_elem_));
+	program_distr->num_program_tuples = num_tuples;
 
 	for(int i=0; i<context_distr->num_context_tuples; i++){
 
@@ -687,9 +686,14 @@ cl_program clCreateProgramWithSource (cl_context context, cl_uint count, const c
 
 		program_distr->program_tuples[i].clhandle = (cl_program)(ret_pkt.program);
 		program_distr->program_tuples[i].node = node;
+
+		printf("[clCreateProgramWithSource interposed] program_tuple[%d].clhandle %p\n", i, program_distr->program_tuples[i].clhandle);
+		printf("[clCreateProgramWithSource interposed] program_tuple[%d].node %s\n", i, program_distr->program_tuples[i].node);
+
 		err |= ret_pkt.err;
 
 	}
+
 
 	*errcode_ret = err;
 	return (cl_program)program_distr;
@@ -700,7 +704,200 @@ cl_program clCreateProgramWithSource (cl_context context, cl_uint count, const c
 
 cl_int clBuildProgram (cl_program program, cl_uint num_devices, const cl_device_id *device_list, const char *options, void (CL_CALLBACK*pfn_notify)(cl_program program, void *user_data), void *user_data){
 
-	return CL_SUCCESS;
+        if((!device_list && num_devices)&&(device_list && !num_devices)){
+                return CL_INVALID_VALUE;
+        }
+
+        cl_int err = CL_SUCCESS;
+
+        cl_program_ *program_distr = (cl_program_ *)program;
+
+	for(int i=0; i<program_distr->num_program_tuples; i++ ){
+
+		printf("[clBuildProgram interposed] program_tuple[%d].clhandle %p\n", i, program_distr->program_tuples[i].clhandle);
+		printf("[clBuildProgram interposed] program_tuple[%d].node %s\n", i, program_distr->program_tuples[i].node);
+	}
+
+	if(!device_list){ //Build the program for all devices in the context
+
+		for(int j=0; j<program_distr->num_program_tuples; j++){
+			xdrproc_t xdr_arg, xdr_ret;
+
+			xdr_arg = (xdrproc_t)_xdr_build_program;
+			xdr_ret = (xdrproc_t)_xdr_build_program;
+
+			build_program_ arg_pkt, ret_pkt;
+			memset((char *)&arg_pkt, 0, sizeof(build_program_));
+			memset((char *)&ret_pkt, 0, sizeof(build_program_));
+
+			arg_pkt.all_devices = TRUE;
+			arg_pkt.devices.buff_ptr = "\0";
+			arg_pkt.devices.buff_len = sizeof(char);
+
+			ret_pkt.devices.buff_ptr = NULL;
+
+			arg_pkt.program = (unsigned long)(program_distr->program_tuples[j].clhandle);
+			printf("[clBuildProgram interposed] program %p", arg_pkt.program);
+
+			char *curr_node = program_distr->program_tuples[j].node;
+
+			register CLIENT *clnt;
+			int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+			struct hostent *hp;
+			struct sockaddr_in server_addr;
+
+			/* get the internet address of RPC server */
+			if ((hp = gethostbyname(curr_node)) == NULL){
+				printf("Can't get address for %s\n",curr_node);
+				exit (-1);
+			}
+
+			bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+			server_addr.sin_family = AF_INET;
+			server_addr.sin_port = 0;
+
+			/* create TCP handle */
+			if ((clnt = clnttcp_create(&server_addr, BUILD_PROGRAM_PROG, BUILD_PROGRAM_VERS,
+							&sock, 0, 0)) == NULL){
+				clnt_pcreateerror("clnttcp_create");
+				exit(-1);
+			}
+			printf("[clBuildProgram interposed]clnttcp_create OK\n");
+
+			enum clnt_stat cs;
+			struct timeval  total_timeout;
+			total_timeout.tv_sec = 10;
+			total_timeout.tv_usec = 0;
+
+			cs=clnt_call(clnt, BUILD_PROGRAM, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+			if ( cs != RPC_SUCCESS){
+				printf("clnt_call failed \n");
+			}
+			printf("[clBuildProgram interposed]clnt_call OK\n");
+			err |= ret_pkt.err;
+
+		}
+
+		return err;
+	}
+	
+	//Arrange the device list passed across per node aggregates
+        std::map <char *, std::vector<cl_device_id> > devicevector_per_node;
+
+        for(int i=0; i<num_devices; i++){
+
+                cl_device_id_ *device_distr = (cl_device_id_ *)device_list[i];
+
+                char *node = device_distr->node;
+
+                cl_device_id clhandle = device_distr->clhandle;
+
+                std::map<char *, std::vector<cl_device_id> >::iterator it = devicevector_per_node.find(node);
+
+                if(it == devicevector_per_node.end()){
+                        std::vector<cl_device_id> devicevector;
+                        devicevector.push_back(clhandle);
+                        devicevector_per_node.insert(make_pair(node, devicevector));
+                } else {
+                        std::vector<cl_device_id> devicevector = it->second;
+                        devicevector.push_back(clhandle);
+                        devicevector_per_node[node] = devicevector;
+                }
+
+        }
+
+
+        int tuple_counter = 0;
+        for(std::map <char *, std::vector<cl_device_id> >::iterator it=devicevector_per_node.begin();
+                it != devicevector_per_node.end();
+                it++ ){
+
+                xdrproc_t xdr_arg, xdr_ret;
+
+                xdr_arg = (xdrproc_t)_xdr_build_program;
+                xdr_ret = (xdrproc_t)_xdr_build_program;
+
+                build_program_ arg_pkt, ret_pkt;
+                memset((char *)&arg_pkt, 0, sizeof(build_program_));
+                memset((char *)&ret_pkt, 0, sizeof(build_program_));
+
+                std::vector<cl_device_id> devicevector = it->second;
+
+                arg_pkt.num_devices = devicevector.size();
+
+                cl_device_id *device_list = (cl_device_id *)malloc(arg_pkt.num_devices * sizeof(cl_device_id));
+
+                int device_count = 0;
+                for(std::vector<cl_device_id>::iterator itv=devicevector.begin();
+                        itv != devicevector.end();
+                        itv++){
+
+                        device_list[device_count++] = (*itv);
+                        printf("[clBuildProgram interposed] device %p\n", (*itv));
+
+                }
+                assert(devicevector.size() == device_count);
+
+		arg_pkt.all_devices = FALSE;
+		arg_pkt.devices.buff_ptr = (char *)device_list;
+                arg_pkt.devices.buff_len = sizeof(cl_device_id)*device_count;
+
+                ret_pkt.devices.buff_ptr = NULL;
+                char *curr_node = it->first;
+		printf("[clBuildProgram interposed] devices on node %s\n", curr_node);
+
+		//Can replace this search repititively by first arranging program_distr into a map
+		//and then doing a find each time
+		for(int j=0; j<program_distr->num_program_tuples; j++){
+			if(curr_node != program_distr->program_tuples[j].node){
+				continue;
+			}
+			//printf("[clBuildProgram interposed] program_tuple[%d].clhandle %p\n", j, program_distr->program_tuples[j].clhandle);
+			//printf("[clBuildProgram interposed] program_tuple[%d].node %s\n", j, program_distr->program_tuples[j].node);
+			arg_pkt.program = (unsigned long)(program_distr->program_tuples[j].clhandle);
+			//printf("[clBuildProgram interposed] program %p\n", arg_pkt.program);
+			break;
+		}			
+		printf("[clBuildProgram interposed] program %p\n", arg_pkt.program);
+
+                register CLIENT *clnt;
+                int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+                struct hostent *hp;
+                struct sockaddr_in server_addr;
+
+                /* get the internet address of RPC server */
+                if ((hp = gethostbyname(curr_node)) == NULL){
+                        printf("Can't get address for %s\n",curr_node);
+                        exit (-1);
+                }
+
+                bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+                server_addr.sin_family = AF_INET;
+                server_addr.sin_port = 0;
+
+                /* create TCP handle */
+                if ((clnt = clnttcp_create(&server_addr, BUILD_PROGRAM_PROG, BUILD_PROGRAM_VERS,
+                                                &sock, 0, 0)) == NULL){
+                        clnt_pcreateerror("clnttcp_create");
+                        exit(-1);
+                }
+                printf("[clBuildProgram interposed]clnttcp_create OK\n");
+
+                enum clnt_stat cs;
+                struct timeval  total_timeout;
+                total_timeout.tv_sec = 10;
+                total_timeout.tv_usec = 0;
+
+                cs=clnt_call(clnt, BUILD_PROGRAM, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+                if ( cs != RPC_SUCCESS){
+                        printf("clnt_call failed \n");
+                }
+                printf("[clBuildProgram interposed]clnt_call OK\n");
+                err |= ret_pkt.err;
+
+        }
+
+        return err;
 
 }
 
