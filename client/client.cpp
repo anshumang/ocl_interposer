@@ -578,8 +578,78 @@ cl_program clCreateProgramWithSource (cl_context context, cl_uint count, const c
 
 	cl_program program = 0;
 	
-	*errcode_ret = CL_SUCCESS;
-	return program;
+	cl_context_ *context_distr = (cl_context_ *)context;
+	int num_tuples = context_distr->num_context_tuples;
+
+	cl_program_ *program_distr = (cl_program_ *)malloc(sizeof(cl_program_));
+	program_distr->program_tuples = (cl_program_elem_ *)malloc(num_tuples * sizeof(cl_program_elem_));
+
+	for(int i=0; i<context_distr->num_context_tuples; i++){
+
+		char *node = context_distr->context_tuples[i].node;
+		printf("[clCreateProgramWithSource interposed] node %s\n", node);
+
+		cl_context context_clhandle = context_distr->context_tuples[i].clhandle;
+		printf("[clCreateProgramWithSource interposed] context %p\n", context_clhandle);
+
+		xdrproc_t xdr_arg, xdr_ret;
+
+		xdr_arg = (xdrproc_t)_xdr_create_program_with_source;
+		xdr_ret = (xdrproc_t)_xdr_create_program_with_source;
+
+		create_program_with_source_ arg_pkt, ret_pkt;
+		memset((char *)&arg_pkt, 0, sizeof(create_program_with_source_));
+		memset((char *)&ret_pkt, 0, sizeof(create_program_with_source_));
+
+		arg_pkt.context = (unsigned long)context_clhandle;
+
+		register CLIENT *clnt;
+		int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+		struct hostent *hp;
+		struct sockaddr_in server_addr;
+
+		/* get the internet address of RPC server */
+		if ((hp = gethostbyname(node)) == NULL){
+			printf("Can't get address for %s\n", node);
+			exit (-1);
+		}
+
+		bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+		server_addr.sin_family = AF_INET;
+		server_addr.sin_port = 0;
+
+		/* create TCP handle */
+		if ((clnt = clnttcp_create(&server_addr, CREATE_PROGRAM_WITH_SOURCE_PROG, CREATE_PROGRAM_WITH_SOURCE_VERS,
+						&sock, 0, 0)) == NULL){
+			clnt_pcreateerror("clnttcp_create");
+			exit(-1);
+		}
+
+		printf("[clCreateProgramWithSource interposed]clnttcp_create OK\n");
+
+		enum clnt_stat cs;
+		struct timeval  total_timeout;
+		total_timeout.tv_sec = 10;
+		total_timeout.tv_usec = 0;
+
+		cs=clnt_call(clnt, CREATE_PROGRAM_WITH_SOURCE, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+		if ( cs != RPC_SUCCESS){
+			printf("clnt_call failed \n");
+		}
+
+		printf("[clCreateProgramWithSource interposed] program returned %p\n", ret_pkt.program);
+
+		program_distr->program_tuples[i].clhandle = (cl_program)(ret_pkt.program);
+		program_distr->program_tuples[i].node = node;
+		err |= ret_pkt.err;
+
+	}
+
+	*errcode_ret = err;
+	return (cl_mem)program_distr;
+	
+	//*errcode_ret = CL_SUCCESS;
+	//return program;
 }
 
 cl_int clBuildProgram (cl_program program, cl_uint num_devices, const cl_device_id *device_list, const char *options, void (CL_CALLBACK*pfn_notify)(cl_program program, void *user_data), void *user_data){
