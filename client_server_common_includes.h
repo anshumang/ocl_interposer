@@ -1,32 +1,32 @@
-#define GET_PLATFORM_IDS_PROG 0x31000000
+#define GET_PLATFORM_IDS_PROG 0x15000000
 #define GET_PLATFORM_IDS_VERS 1
 #define GET_PLATFORM_IDS 0x1
 
-#define GET_DEVICE_IDS_PROG 0x03100000
+#define GET_DEVICE_IDS_PROG 0x01500000
 #define GET_DEVICE_IDS_VERS 1
 #define GET_DEVICE_IDS 0x2
 
-#define CREATE_CONTEXT_PROG 0x00310000
+#define CREATE_CONTEXT_PROG 0x00150000
 #define CREATE_CONTEXT_VERS 1
 #define CREATE_CONTEXT 0x3
 
-#define CREATE_COMMAND_QUEUE_PROG 0x00031000
+#define CREATE_COMMAND_QUEUE_PROG 0x00015000
 #define CREATE_COMMAND_QUEUE_VERS 1
 #define CREATE_COMMAND_QUEUE 0x4
 
-#define CREATE_BUFFER_PROG 0x00003100
+#define CREATE_BUFFER_PROG 0x00001500
 #define CREATE_BUFFER_VERS 1
 #define CREATE_BUFFER 0x5
 
-#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00000B00
+#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00001F00
 #define CREATE_PROGRAM_WITH_SOURCE_VERS 1
 #define CREATE_PROGRAM_WITH_SOURCE 0x6
 
-#define BUILD_PROGRAM_PROG 0x000000B0
+#define BUILD_PROGRAM_PROG 0x000001F0
 #define BUILD_PROGRAM_VERS 1
 #define BUILD_PROGRAM 0x7
 
-#define CREATE_KERNEL_PROG 0x00000004
+#define CREATE_KERNEL_PROG 0x00000005
 #define CREATE_KERNEL_VERS 1
 #define CREATE_KERNEL 0x8
 
@@ -324,6 +324,7 @@ bool_t _xdr_create_program_with_source(XDR *xdrs, create_program_with_source_ *o
 	return TRUE;
 }
 
+
 typedef struct build_program_xdr {
 	unsigned long program; //Client to Server
 	bool_t all_devices; //C2S
@@ -370,6 +371,48 @@ bool_t _xdr_build_program(XDR *xdrs, build_program_ *objp){
 	if(xdrs->x_op == XDR_DECODE){
 		printf("[_xdr_build_program] xdr decode\n");
 		printf("[_xdr_build_program] program %p\n", objp->program);
+	}
+#endif
+
+	return TRUE;
+}
+
+typedef struct create_kernel {
+	unsigned long program; //Client to Server
+	buff_xdr_ kernel_name; //C2S
+	int err; //Server to Client
+	unsigned long kernel; //S2C
+} create_kernel_;
+
+bool_t _xdr_create_kernel(XDR *xdrs, create_kernel_ *objp){
+
+#ifdef XDR_DEBUG
+	if(xdrs->x_op == XDR_ENCODE){
+		printf("[_xdr_create_kernel] xdr encode\n");
+		printf("[_xdr_create_kernel] program %p\n", objp->program);
+	}
+#endif
+
+	if(!xdr_u_long(xdrs, &(objp->program))){
+		return FALSE;
+	}
+
+	if (!xdr_bytes (xdrs, (char **)&objp->kernel_name.buff_ptr, (u_int *) &objp->kernel_name.buff_len, ~0)){
+		return FALSE;
+	}
+
+	if(!xdr_u_long(xdrs, &(objp->kernel))){
+		return FALSE;
+	}
+
+	if(!xdr_int(xdrs, &(objp->err))){
+		return FALSE;
+	}
+
+#ifdef XDR_DEBUG
+	if(xdrs->x_op == XDR_DECODE){
+		printf("[_xdr_create_kernel] xdr decode\n");
+		printf("[_xdr_create_kernel] program %p\n", objp->program);
 	}
 #endif
 

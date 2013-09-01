@@ -507,6 +507,71 @@ void clBuildProgram_server_wrapper(struct svc_req *rqstp, register SVCXPRT *tran
         return;
 }
 
+void clCreateKernel_server(create_kernel_ *argp, create_kernel_ *retp){
+
+	cl_int err = CL_SUCCESS;
+
+        cl_kernel kernel = 0;
+
+        printf("[clCreateKernel_server] program %p\n", argp->program);
+        printf("[clCreateKernel_server] kernel_name %s\n", argp->kernel_name.buff_ptr);
+
+        kernel  = clCreateKernel((cl_program)(argp->program), (const char *)(argp->kernel_name.buff_ptr), &err);
+        //kernel  = clCreateKernel((cl_program)(argp->program), "helloworld", &err);
+
+        if(err != CL_SUCCESS){
+                printf("clCreateKernel failed with err %d\n", err);
+                exit(-1);
+        }
+	retp->err = err;
+
+	retp->kernel_name.buff_ptr = "\0";
+	retp->kernel_name.buff_len = sizeof(char);	
+
+	retp->kernel = (unsigned long)kernel;
+
+        printf("[clCreateKernel_server] kernel created %p\n", retp->kernel);
+
+}
+
+void clCreateKernel_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_create_kernel;
+	xdr_ret = (xdrproc_t)_xdr_create_kernel;
+
+	create_kernel_ arg_pkt, ret_pkt;
+
+	memset((char *)&arg_pkt, 0, sizeof(create_kernel_));
+	memset((char *)&ret_pkt, 0, sizeof(create_kernel_));
+
+	arg_pkt.kernel_name.buff_ptr = NULL;
+
+	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
+		svcerr_decode(transp);
+		exit(-1);
+	}
+	printf("[clCreateKernel_server_wrapper] svc_getargs OK\n");
+
+	clCreateKernel_server(&arg_pkt, &ret_pkt);
+	printf("[clCreateKernel_server_wrapper] clCall_server OK\n");
+
+        if (!svc_sendreply(transp, (xdrproc_t) xdr_ret, (char *)&ret_pkt)) {
+                svcerr_systemerr (transp);
+		exit(-1);
+        }
+	printf("[clCreateKernel_server_wrapper] svc_sendreply OK\n");
+
+        if (!svc_freeargs (transp, (xdrproc_t) xdr_arg, (caddr_t) &arg_pkt)) {
+                printf ("%s", "unable to free arguments");
+                exit (-1);
+        }
+	printf("[clCreateKernel_server_wrapper] svc_freeargs OK\n");
+
+        return;
+}
+
 int main(){
 
         SVCXPRT *transp;
@@ -596,6 +661,15 @@ int main(){
 
 	printf("[main] svctcp_register BUILD_PROGRAM_PROG OK\n");
 
+	svc_unregister(CREATE_KERNEL_PROG, CREATE_KERNEL_VERS);
+
+        if (!svc_register(transp, CREATE_KERNEL_PROG, CREATE_KERNEL_VERS,clCreateKernel_server_wrapper, IPPROTO_TCP)) {
+                printf ("%s", "unable to register (CREATE_KERNEL_PROG, CREATE_KERNEL_VERS, tcp).");
+                exit(-1);
+        }
+
+	printf("[main] svctcp_register CREATE_KERNEL_PROG OK\n");
+
 	svc_run();
 
 	printf("[main] this message should be unreachable");
@@ -603,3 +677,4 @@ int main(){
 	exit(-1);
 
 }
+

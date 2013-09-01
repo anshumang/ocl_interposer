@@ -154,10 +154,10 @@ int main(){
                                         exit(-1);
                                 }
 
-#if 0
 				cl_kernel kern;
 
 				kern = clCreateKernel(prog, "helloworld", &err);
+				printf("CL_INVALID_KERNEL_NAME %d\n",CL_INVALID_KERNEL_NAME);
 				if(err != CL_SUCCESS){
                                         printf("clCreateKernel failed with err %d\n", err);
                                         exit(-1);
@@ -166,6 +166,7 @@ int main(){
 
 				size_t size_l = 1;
 
+#if 0
 				for(int j=0; j<num_devices; j++){
 					//char param_value[1024];
 					size_t param_value = 0;

@@ -56,3 +56,15 @@ typedef struct cl_program_distr {
 	unsigned int num_program_tuples;
 
 } cl_program_;
+
+typedef struct cl_kernel_distr_elem {
+	char *node;
+	cl_kernel clhandle;
+} cl_kernel_elem_;
+
+typedef struct cl_kernel_distr {
+
+	cl_kernel_elem_ *kernel_tuples;
+	unsigned int num_kernel_tuples;
+
+} cl_kernel_;

@@ -950,10 +950,89 @@ cl_int clBuildProgram (cl_program program, cl_uint num_devices, const cl_device_
 
 cl_kernel clCreateKernel (cl_program program,const char *kernel_name, cl_int *errcode_ret){
 
-	cl_kernel kernel = 0;
+	//cl_kernel kernel = 0;
+	
+	cl_int err = CL_SUCCESS;
+	cl_program_ *program_distr = (cl_program_ *)program;
+	int num_tuples = program_distr->num_program_tuples;
 
-	*errcode_ret = CL_SUCCESS;
-	return kernel;
+	cl_kernel_ *kernel_distr = (cl_kernel_ *)malloc(sizeof(cl_kernel_));
+	kernel_distr->kernel_tuples = (cl_kernel_elem_ *)malloc(num_tuples * sizeof(cl_kernel_elem_));
+	kernel_distr->num_kernel_tuples = num_tuples;
+
+	for(int i=0; i<program_distr->num_program_tuples; i++){
+
+		char *node = program_distr->program_tuples[i].node;
+		printf("[clCreateKernel interposed] node %s\n", node);
+
+		cl_program program_clhandle = program_distr->program_tuples[i].clhandle;
+		printf("[clCreateKernel interposed] program %p\n", program_clhandle);
+
+		xdrproc_t xdr_arg, xdr_ret;
+
+		xdr_arg = (xdrproc_t)_xdr_create_kernel;
+		xdr_ret = (xdrproc_t)_xdr_create_kernel;
+
+		create_kernel_ arg_pkt, ret_pkt;
+		memset((char *)&arg_pkt, 0, sizeof(create_kernel_));
+		memset((char *)&ret_pkt, 0, sizeof(create_kernel_));
+
+		arg_pkt.program = (unsigned long)program_clhandle;
+		arg_pkt.kernel_name.buff_ptr = (char *)kernel_name;
+		arg_pkt.kernel_name.buff_len = strlen(kernel_name);
+
+		register CLIENT *clnt;
+		int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+		struct hostent *hp;
+		struct sockaddr_in server_addr;
+
+		/* get the internet address of RPC server */
+		if ((hp = gethostbyname(node)) == NULL){
+			printf("Can't get address for %s\n", node);
+			exit (-1);
+		}
+
+		bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+		server_addr.sin_family = AF_INET;
+		server_addr.sin_port = 0;
+
+		/* create TCP handle */
+		if ((clnt = clnttcp_create(&server_addr, CREATE_KERNEL_PROG, CREATE_KERNEL_VERS,
+						&sock, 0, 0)) == NULL){
+			clnt_pcreateerror("clnttcp_create");
+			exit(-1);
+		}
+
+		printf("[clCreateKernel interposed]clnttcp_create OK\n");
+
+		enum clnt_stat cs;
+		struct timeval  total_timeout;
+		total_timeout.tv_sec = 10;
+		total_timeout.tv_usec = 0;
+
+		cs=clnt_call(clnt, CREATE_KERNEL, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+		if ( cs != RPC_SUCCESS){
+			printf("clnt_call failed \n");
+		}
+
+		printf("[clCreateKernel interposed] kernel returned %p\n", ret_pkt.kernel);
+
+		kernel_distr->kernel_tuples[i].clhandle = (cl_kernel)(ret_pkt.kernel);
+		kernel_distr->kernel_tuples[i].node = node;
+
+		printf("[clCreateKernel interposed] kernel_tuple[%d].clhandle %p\n", i, kernel_distr->kernel_tuples[i].clhandle);
+		printf("[clCreateKernel interposed] kernel_tuple[%d].node %s\n", i, kernel_distr->kernel_tuples[i].node);
+
+		err |= ret_pkt.err;
+
+	}
+
+
+	*errcode_ret = err;
+	return (cl_kernel)kernel_distr;
+
+	//*errcode_ret = CL_SUCCESS;
+	//return kernel;
 }
 
 cl_int clSetKernelArg (cl_kernel kernel, cl_uint arg_index,size_t arg_size, const void *arg_value){
