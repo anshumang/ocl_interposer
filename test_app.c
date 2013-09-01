@@ -132,7 +132,11 @@ int main(){
                                 }
 				printf("[main] Program %p\n", prog);
 
-				err = clBuildProgram(prog, num_devices, devices, NULL, NULL, NULL);
+				//char *kernel_arg_option = "-cl-kernel-arg-info";
+				//char *kernel_arg_option = "-cl-opt-disable";
+				char *kernel_arg_option = "";
+
+				err = clBuildProgram(prog, num_devices, devices, kernel_arg_option, NULL, NULL);
 				if(err != CL_SUCCESS){
                                         printf("clBuildProgram failed with err %d\n", err);
 					printf("CL_BUILD_PROGRAM_FAILURE %d\n", err);

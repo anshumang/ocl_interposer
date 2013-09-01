@@ -482,6 +482,10 @@ cl_command_queue clCreateCommandQueue (cl_context context, cl_device_id device,c
 
 }
 
+//WORKAROUND
+//-cl-get-kernel-arg-info not supported in the compiler version installed
+std::vector<cl_mem_*> mems_created;
+
 cl_mem clCreateBuffer (cl_context context, cl_mem_flags flags, size_t size, void *host_ptr, cl_int *errcode_ret){
 
 	cl_int err = CL_SUCCESS;
@@ -491,6 +495,9 @@ cl_mem clCreateBuffer (cl_context context, cl_mem_flags flags, size_t size, void
 
 	cl_mem_ *mem_distr = (cl_mem_ *)malloc(sizeof(cl_mem_));
 	mem_distr->mem_tuples = (cl_mem_elem_ *)malloc(num_tuples * sizeof(cl_mem_elem_));
+
+	//WORKAROUND
+	mems_created.push_back(mem_distr);
 
 	bool send_data = flags & CL_MEM_COPY_HOST_PTR;
 
@@ -718,6 +725,35 @@ cl_int clBuildProgram (cl_program program, cl_uint num_devices, const cl_device_
 		printf("[clBuildProgram interposed] program_tuple[%d].node %s\n", i, program_distr->program_tuples[i].node);
 	}
 
+	//-cl-kernel-arg-info not supported in the compiler version installed
+	//WORKAROUND added in clCreateBuffer
+	//char *kernel_arg_option = "-cl-kernel-arg-info";
+	char *kernel_arg_option = "";
+
+	int tot_options_size;
+	if(options){
+	  tot_options_size = strlen(kernel_arg_option) + strlen(options);
+	} else {
+          tot_options_size = strlen(kernel_arg_option);
+	}	
+
+	char tot_options[tot_options_size+1];
+	
+	if(options){
+		strcpy(tot_options, options);
+		tot_options[strlen(options)] = ' ';
+		for(int i=0; i<strlen(kernel_arg_option); i++){
+			tot_options[strlen(options)+1+i] = kernel_arg_option[i];	
+		}
+	} else {
+		for(int i=0; i<strlen(kernel_arg_option); i++){
+			tot_options[i] = kernel_arg_option[i];
+		}
+	}
+
+	tot_options[tot_options_size] = '\0';
+
+
 	if(!device_list){ //Build the program for all devices in the context
 
 		for(int j=0; j<program_distr->num_program_tuples; j++){
@@ -734,7 +770,11 @@ cl_int clBuildProgram (cl_program program, cl_uint num_devices, const cl_device_
 			arg_pkt.devices.buff_ptr = "\0";
 			arg_pkt.devices.buff_len = sizeof(char);
 
+			arg_pkt.options.buff_ptr = tot_options;
+			arg_pkt.options.buff_len = tot_options_size;
+
 			ret_pkt.devices.buff_ptr = NULL;
+			ret_pkt.options.buff_ptr = NULL;
 
 			arg_pkt.program = (unsigned long)(program_distr->program_tuples[j].clhandle);
 			printf("[clBuildProgram interposed] program %p", arg_pkt.program);
@@ -842,7 +882,14 @@ cl_int clBuildProgram (cl_program program, cl_uint num_devices, const cl_device_
 		arg_pkt.devices.buff_ptr = (char *)device_list;
                 arg_pkt.devices.buff_len = sizeof(cl_device_id)*device_count;
 
+		arg_pkt.options.buff_ptr = tot_options;
+		arg_pkt.options.buff_len = tot_options_size;
+
+		printf("[clBuildProgram interposed] options %s len %d len(from strlen) %d\n", arg_pkt.options.buff_ptr, arg_pkt.options.buff_len, strlen(arg_pkt.options.buff_ptr));
+
                 ret_pkt.devices.buff_ptr = NULL;
+                ret_pkt.options.buff_ptr = NULL;
+
                 char *curr_node = it->first;
 		printf("[clBuildProgram interposed] devices on node %s\n", curr_node);
 

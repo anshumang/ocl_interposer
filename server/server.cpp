@@ -447,6 +447,7 @@ void clBuildProgram_server(build_program_ *argp, build_program_ *retp){
 	cl_int err = CL_SUCCESS;
 
         printf("[clBuildProgram_server] program %p\n", argp->program);
+	printf("[clBuildProgram_server] options %s\n", argp->options.buff_ptr);
 	
 	if(argp->all_devices){
 		err  = clBuildProgram((cl_program)(argp->program), 0, NULL, (const char *)(argp->options.buff_ptr), NULL, NULL);
