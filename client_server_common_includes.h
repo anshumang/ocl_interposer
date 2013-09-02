@@ -1,36 +1,36 @@
-#define GET_PLATFORM_IDS_PROG 0x15000000
+#define GET_PLATFORM_IDS_PROG 0x1E000000
 #define GET_PLATFORM_IDS_VERS 1
 #define GET_PLATFORM_IDS 0x1
 
-#define GET_DEVICE_IDS_PROG 0x01500000
+#define GET_DEVICE_IDS_PROG 0x01E00000
 #define GET_DEVICE_IDS_VERS 1
 #define GET_DEVICE_IDS 0x2
 
-#define CREATE_CONTEXT_PROG 0x00150000
+#define CREATE_CONTEXT_PROG 0x001E0000
 #define CREATE_CONTEXT_VERS 1
 #define CREATE_CONTEXT 0x3
 
-#define CREATE_COMMAND_QUEUE_PROG 0x00015000
+#define CREATE_COMMAND_QUEUE_PROG 0x0001E000
 #define CREATE_COMMAND_QUEUE_VERS 1
 #define CREATE_COMMAND_QUEUE 0x4
 
-#define CREATE_BUFFER_PROG 0x00001500
+#define CREATE_BUFFER_PROG 0x00001E00
 #define CREATE_BUFFER_VERS 1
 #define CREATE_BUFFER 0x5
 
-#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00001F00
+#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00002900
 #define CREATE_PROGRAM_WITH_SOURCE_VERS 1
 #define CREATE_PROGRAM_WITH_SOURCE 0x6
 
-#define BUILD_PROGRAM_PROG 0x000001F0
+#define BUILD_PROGRAM_PROG 0x00000290
 #define BUILD_PROGRAM_VERS 1
 #define BUILD_PROGRAM 0x7
 
-#define CREATE_KERNEL_PROG 0x00000005
+#define CREATE_KERNEL_PROG 0x0000000D
 #define CREATE_KERNEL_VERS 1
 #define CREATE_KERNEL 0x8
 
-#define SET_KERNEL_ARG_PROG 0x10000004
+#define SET_KERNEL_ARG_PROG 0x10000008
 #define SET_KERNEL_ARG_VERS 1
 #define SET_KERNEL_ARG 0x9
 
@@ -418,3 +418,91 @@ bool_t _xdr_create_kernel(XDR *xdrs, create_kernel_ *objp){
 
 	return TRUE;
 }
+
+typedef struct set_kernel_arg {
+	unsigned long kernel; //Client to Server
+	unsigned long mem; //C2S
+	unsigned long image; //C2S
+	unsigned long sampler; //C2S
+	bool_t is_clobj; //C2S
+	bool_t is_mem; //C2S
+	bool_t is_image; //C2S
+	bool_t is_sampler; //C2S
+	bool_t is_null_arg; //C2S
+	int arg_index; //C2S
+	int arg_size; //C2S
+	buff_xdr_ plain_old_data; //C2S
+	int err; //Server to Client
+} set_kernel_arg_;
+
+bool_t _xdr_set_kernel_arg(XDR *xdrs, set_kernel_arg_ *objp){
+
+#ifndef XDR_DEBUG
+	if(xdrs->x_op == XDR_ENCODE){
+		printf("[_xdr_set_kernel_arg] xdr encode\n");
+	}
+	if(xdrs->x_op == XDR_DECODE){
+		printf("[_xdr_set_kernel_arg] xdr decode\n");
+	}
+#endif
+
+	if(!xdr_u_long(xdrs, &(objp->kernel))){
+		return FALSE;
+	}
+
+	if(!xdr_u_long(xdrs, &(objp->mem))){
+		return FALSE;
+	}
+
+	if(!xdr_u_long(xdrs, &(objp->image))){
+		return FALSE;
+	}
+
+	if(!xdr_u_long(xdrs, &(objp->sampler))){
+		return FALSE;
+	}
+
+	printf("[_xdr_set_kernel_arg] buff_ptr %p buff_len %d\n", objp->plain_old_data.buff_ptr, objp->plain_old_data.buff_len);
+
+	if (!xdr_bytes (xdrs, (char **)&objp->plain_old_data.buff_ptr, (u_int *) &objp->plain_old_data.buff_len, ~0)){
+		return FALSE;
+	}
+
+	printf("[_xdr_set_kernel_arg] buff_ptr %p buff_len %d\n", objp->plain_old_data.buff_ptr, objp->plain_old_data.buff_len);
+
+	if(!xdr_bool(xdrs, &(objp->is_clobj))){
+		return FALSE;
+	}
+
+	if(!xdr_bool(xdrs, &(objp->is_mem))){
+		return FALSE;
+	}
+
+	if(!xdr_bool(xdrs, &(objp->is_image))){
+		return FALSE;
+	}
+
+	if(!xdr_bool(xdrs, &(objp->is_sampler))){
+		return FALSE;
+	}
+
+	if(!xdr_bool(xdrs, &(objp->is_null_arg))){
+		return FALSE;
+	}
+
+	if(!xdr_int(xdrs, &(objp->arg_index))){
+		return FALSE;
+	}
+
+	if(!xdr_int(xdrs, &(objp->arg_size))){
+		return FALSE;
+	}
+
+	if(!xdr_int(xdrs, &(objp->err))){
+		return FALSE;
+	}
+
+
+	return TRUE;
+}
+

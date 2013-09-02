@@ -3,6 +3,7 @@
 #include <rpc/rpc.h>
 #include <sys/socket.h>
 #include "../client_server_common_includes.h"
+#include <assert.h>
 
 void clGetPlatformIDs_server(get_platform_ids_ *argp, get_platform_ids_ *retp){
 
@@ -516,8 +517,8 @@ void clCreateKernel_server(create_kernel_ *argp, create_kernel_ *retp){
         printf("[clCreateKernel_server] program %p\n", argp->program);
         printf("[clCreateKernel_server] kernel_name %s\n", argp->kernel_name.buff_ptr);
 
-        kernel  = clCreateKernel((cl_program)(argp->program), (const char *)(argp->kernel_name.buff_ptr), &err);
-        //kernel  = clCreateKernel((cl_program)(argp->program), "helloworld", &err);
+        //kernel  = clCreateKernel((cl_program)(argp->program), (const char *)(argp->kernel_name.buff_ptr), &err);
+        kernel  = clCreateKernel((cl_program)(argp->program), "helloworld", &err);
 
         if(err != CL_SUCCESS){
                 printf("clCreateKernel failed with err %d\n", err);
@@ -568,6 +569,89 @@ void clCreateKernel_server_wrapper(struct svc_req *rqstp, register SVCXPRT *tran
                 exit (-1);
         }
 	printf("[clCreateKernel_server_wrapper] svc_freeargs OK\n");
+
+        return;
+}
+
+void clSetKernelArg_server(set_kernel_arg_ *argp, set_kernel_arg_ *retp){
+
+	cl_int err = CL_SUCCESS;
+
+        cl_kernel kernel = 0;
+
+        printf("[clSetKernelArg_server] kernel %p\n", argp->kernel);
+
+	if(argp->is_null_arg){
+		err  = clSetKernelArg((cl_kernel)(argp->kernel), argp->arg_index, argp->arg_size, NULL);
+	} else if (argp->is_clobj) {
+		if(argp->is_mem){
+			cl_mem mem = (cl_mem)(argp->mem);
+			printf("[clSetKernelArg_server] mem %p\n", mem);
+			assert(argp->arg_size == sizeof(cl_mem));
+			err = clSetKernelArg((cl_kernel)(argp->kernel), argp->arg_index, sizeof(cl_mem), (void *)&mem);
+		} else if (argp->is_image){
+			//cl_image not supported in the runtime version installed on shiva
+			//cl_image image = (cl_image)(argp->image);
+			//assert(argp->arg_size == sizeof(cl_image));
+			//err = clSetKernelArg((cl_kernel)(argp->kernel), argp->arg_index, sizeof(cl_image), (void *)&image);
+		} else if (argp->is_sampler) {
+			cl_sampler sampler = (cl_sampler)(argp->sampler);
+			assert(argp->arg_size == sizeof(cl_sampler));
+			err = clSetKernelArg((cl_kernel)(argp->kernel), argp->arg_index, sizeof(cl_sampler), (void *)&sampler);
+		} else {
+			assert(0); //should not be here
+		}
+
+	} else {
+		err  = clSetKernelArg((cl_kernel)(argp->kernel), argp->arg_index, argp->arg_size, (void *)(argp->plain_old_data.buff_ptr));
+	}
+
+        if(err != CL_SUCCESS){
+                printf("clCreateKernel failed with err %d\n", err);
+                exit(-1);
+        }
+	retp->err = err;
+
+	retp->plain_old_data.buff_ptr = "\0";
+	retp->plain_old_data.buff_len = sizeof(char);	
+
+}
+
+void clSetKernelArg_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_set_kernel_arg;
+	xdr_ret = (xdrproc_t)_xdr_set_kernel_arg;
+
+	set_kernel_arg_ arg_pkt, ret_pkt;
+
+	memset((char *)&arg_pkt, 0, sizeof(set_kernel_arg_));
+	memset((char *)&ret_pkt, 0, sizeof(set_kernel_arg_));
+
+	arg_pkt.plain_old_data.buff_ptr = NULL;
+
+	printf("[clSetKernelArg_server_wrapper] svc_getargs starting\n");
+	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
+		svcerr_decode(transp);
+		exit(-1);
+	}
+	printf("[clSetKernelArg_server_wrapper] svc_getargs OK\n");
+
+	clSetKernelArg_server(&arg_pkt, &ret_pkt);
+	printf("[clSetKernelArg_server_wrapper] clCall_server OK\n");
+
+        if (!svc_sendreply(transp, (xdrproc_t) xdr_ret, (char *)&ret_pkt)) {
+                svcerr_systemerr (transp);
+		exit(-1);
+        }
+	printf("[clSetKernelArg_server_wrapper] svc_sendreply OK\n");
+
+        if (!svc_freeargs (transp, (xdrproc_t) xdr_arg, (caddr_t) &arg_pkt)) {
+                printf ("%s", "unable to free arguments");
+                exit (-1);
+        }
+	printf("[clSetKernelArg_server_wrapper] svc_freeargs OK\n");
 
         return;
 }
@@ -670,6 +754,14 @@ int main(){
 
 	printf("[main] svctcp_register CREATE_KERNEL_PROG OK\n");
 
+	svc_unregister(SET_KERNEL_ARG_PROG, SET_KERNEL_ARG_VERS);
+
+        if (!svc_register(transp, SET_KERNEL_ARG_PROG, SET_KERNEL_ARG_VERS,clSetKernelArg_server_wrapper, IPPROTO_TCP)) {
+                printf ("%s", "unable to register (SET_KERNEL_ARG_PROG, SET_KERNEL_ARG_VERS, tcp).");
+                exit(-1);
+        }
+
+	printf("[main] svctcp_register SET_KERNEL_ARG_PROG OK\n");
 	svc_run();
 
 	printf("[main] this message should be unreachable");
@@ -677,4 +769,3 @@ int main(){
 	exit(-1);
 
 }
-

@@ -8,6 +8,7 @@
 #include <netdb.h>
 #include <assert.h>
 #include <vector>
+#include <algorithm>
 
 //This should be populated dynamically
 char *nodes[] = {"shiva.cc.gt.atl.ga.us"};
@@ -495,8 +496,11 @@ cl_mem clCreateBuffer (cl_context context, cl_mem_flags flags, size_t size, void
 
 	cl_mem_ *mem_distr = (cl_mem_ *)malloc(sizeof(cl_mem_));
 	mem_distr->mem_tuples = (cl_mem_elem_ *)malloc(num_tuples * sizeof(cl_mem_elem_));
+	mem_distr->num_mem_tuples = num_tuples;
 
 	//WORKAROUND
+	printf("[clCreateBuffer interposed] mem_distr %p\n", mem_distr);
+	printf("[clCreateBuffer interposed] num_tuples %d\n", num_tuples);
 	mems_created.push_back(mem_distr);
 
 	bool send_data = flags & CL_MEM_COPY_HOST_PTR;
@@ -576,6 +580,8 @@ cl_mem clCreateBuffer (cl_context context, cl_mem_flags flags, size_t size, void
 	}
 
 	*errcode_ret = err;
+	printf("[clCreateBuffer interposed] cl_mem_ * returned %p\n", mem_distr);
+	printf("[clCreateBuffer interposed] mem_distr->num_mem_tuples %d\n", mem_distr->num_mem_tuples);
 	return (cl_mem)mem_distr;
 }
 
@@ -1037,7 +1043,137 @@ cl_kernel clCreateKernel (cl_program program,const char *kernel_name, cl_int *er
 
 cl_int clSetKernelArg (cl_kernel kernel, cl_uint arg_index,size_t arg_size, const void *arg_value){
 
-	return CL_SUCCESS;
+	cl_kernel_ *kernel_distr = (cl_kernel_ *)kernel;
+	int num_kernel_tuples = kernel_distr->num_kernel_tuples;
+	cl_int err = CL_SUCCESS;
+
+	bool is_null_arg = FALSE;
+	if(!arg_value){
+		is_null_arg = TRUE;
+	}
+
+	bool is_mem = FALSE, is_image = FALSE, is_sampler = FALSE;
+	std::map<char*, cl_mem> mem_node_map;
+	//std::map<char*, cl_image> image_node_map; //cl_image not supported for the version installed on shiva
+	std::map<char*, cl_sampler> sampler_node_map;
+
+	if(!is_null_arg){
+
+		printf("[clSetKernelArg interposed] is NOT null arg\n");
+		printf("[clSetKernelArg interposed] arg_value %p\n", *((cl_mem_ **)arg_value));
+		std::vector<cl_mem_ *>::iterator it = find(mems_created.begin(), mems_created.end(), *((cl_mem_ **)arg_value)); //cl_mem_ was pushed into the mems_created vector...and now cl_mem_ * is received...so it has to be dereferenced first
+		if(it != mems_created.end()){
+			printf("[clSetKernelArg interposed] is mem\n");
+			is_mem = TRUE;
+			cl_mem_ *mem_distr = (*it);
+			printf("[clSetKernelArg interposed] mem_distr %p\n", mem_distr);
+			printf("[clSetKernelArg interposed] mem_distr->num_mem_tuples %d\n", mem_distr->num_mem_tuples);
+			for(int i=0; i<mem_distr->num_mem_tuples; i++){
+				mem_node_map.insert(std::pair<char*, cl_mem>(mem_distr->mem_tuples[i].node, mem_distr->mem_tuples[i].clhandle));
+				printf("[clSetKernelArg interposed] node %s\n", mem_distr->mem_tuples[i].node);
+				printf("[clSetKernelArg interposed] cl_mem %p\n", mem_distr->mem_tuples[i].clhandle);
+			}
+		}
+
+		//add check for cl_image
+		//add check for cl_sampler
+
+	}
+
+	bool is_clobj = FALSE;
+	if(!is_null_arg && (is_mem || is_image || is_sampler)){
+		is_clobj = TRUE;
+	}
+	
+	for (int i=0; i<num_kernel_tuples; i++){
+		
+                xdrproc_t xdr_arg, xdr_ret;
+
+                xdr_arg = (xdrproc_t)_xdr_set_kernel_arg;
+                xdr_ret = (xdrproc_t)_xdr_set_kernel_arg;
+		
+		set_kernel_arg_ arg_pkt, ret_pkt;
+                memset((char *)&arg_pkt, 0, sizeof(set_kernel_arg_));
+                memset((char *)&ret_pkt, 0, sizeof(set_kernel_arg_));
+
+		arg_pkt.is_null_arg = is_null_arg;
+
+		arg_pkt.is_clobj = is_clobj;
+		arg_pkt.is_mem = is_mem;
+		arg_pkt.is_image = is_image;
+		arg_pkt.is_sampler = is_sampler;
+
+		arg_pkt.arg_index = arg_index;
+
+		arg_pkt.arg_size = arg_size;
+
+		cl_kernel kernel_clhandle = kernel_distr->kernel_tuples[i].clhandle;
+                printf("[clSetKernelArg interposed] kernel %p\n", kernel_clhandle);
+		char *node = kernel_distr->kernel_tuples[i].node;
+                printf("[clSetKernelArg interposed] node %s\n", node);
+
+                arg_pkt.kernel = (unsigned long)kernel_clhandle;
+
+		if(is_clobj || is_null_arg){
+			if(is_clobj && is_mem){
+				std::map<char*, cl_mem>::iterator it = mem_node_map.find(node);
+				assert(it != mem_node_map.end());
+				arg_pkt.mem = (unsigned long)(it->second);
+				printf("[clSetKernelArg interposed] mem %p\n", (cl_mem)(arg_pkt.mem));
+			}
+			//for cl_image
+			//for cl_sampler
+			arg_pkt.plain_old_data.buff_ptr = "\0";
+			arg_pkt.plain_old_data.buff_len = sizeof(char);
+		} else {
+			arg_pkt.plain_old_data.buff_ptr = (char *)arg_value;
+			arg_pkt.plain_old_data.buff_len = arg_size;
+		}
+
+		ret_pkt.plain_old_data.buff_ptr = NULL;
+
+                register CLIENT *clnt;
+                int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+                struct hostent *hp;
+                struct sockaddr_in server_addr;
+
+                /* get the internet address of RPC server */
+                if ((hp = gethostbyname(node)) == NULL){
+                        printf("Can't get address for %s\n", node);
+                        exit (-1);
+                }
+
+                bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+                server_addr.sin_family = AF_INET;
+                server_addr.sin_port = 0;
+
+                /* create TCP handle */
+                if ((clnt = clnttcp_create(&server_addr, SET_KERNEL_ARG_PROG, SET_KERNEL_ARG_VERS,
+                                                &sock, 0, 0)) == NULL){
+                        clnt_pcreateerror("clnttcp_create");
+                        exit(-1);
+                }
+
+                printf("[clSetKernelArg interposed]clnttcp_create OK\n");
+
+                enum clnt_stat cs;
+                struct timeval  total_timeout;
+                total_timeout.tv_sec = 10;
+                total_timeout.tv_usec = 0;
+
+                cs=clnt_call(clnt, SET_KERNEL_ARG, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+                if ( cs != RPC_SUCCESS){
+                        printf("clnt_call failed \n");
+                }
+
+                printf("[clSetKernelArg interposed]clnt_call OK\n");
+                err |= ret_pkt.err;
+
+        }
+
+	printf("[clSetKernelArg interposed] err %d\n", err);
+        return err;
+
 }
 
 cl_int clEnqueueWriteBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bool blocking_write, size_t offset, size_t size,const void *ptr, cl_uint num_events_in_wait_list,const cl_event *event_wait_list, cl_event *event){

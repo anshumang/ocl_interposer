@@ -184,6 +184,7 @@ int main(){
 					}
 					printf("CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE %ld\n", param_value);
 				}
+#endif
 			
 				err = clSetKernelArg(kern, 0, sizeof(cl_mem), (void *)&mem_in);
 				if(err != CL_SUCCESS){
@@ -197,6 +198,7 @@ int main(){
                                         exit(-1);
                                 }
 
+#if 0
 				cl_uint work_dim = 1;
 
 				for(int j=0; j<num_devices; j++){
