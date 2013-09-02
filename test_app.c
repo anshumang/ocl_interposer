@@ -198,7 +198,6 @@ int main(){
                                         exit(-1);
                                 }
 
-#if 0
 				cl_uint work_dim = 1;
 
 				for(int j=0; j<num_devices; j++){
@@ -209,6 +208,7 @@ int main(){
 						exit(-1);
 					}
 
+#if 0
 					size_t global_work_offset[work_dim], global_work_size[work_dim], local_work_size[work_dim];
 					for(int k=0; k<work_dim; k++){
 						global_work_offset[k] = 0;
@@ -226,18 +226,10 @@ int main(){
 					err = clEnqueueReadBuffer(cmd_q[j], mem_out, CL_TRUE, 0, size_g, host_ptr, 0, NULL, NULL);
 					if(err != CL_SUCCESS){
 						printf("clEnqueueReadBuffer failed with err %d\n", err);
-						printf("CL_INVALID_COMMAND_QUEUE %d\n", CL_INVALID_COMMAND_QUEUE);
-						printf("CL_INVALID_CONTEXT %d\n", CL_INVALID_CONTEXT);
-						printf("CL_INVALID_MEM_OBJECT %d\n", CL_INVALID_MEM_OBJECT);
-						printf("CL_MEM_OBJECT_ALLOCATION_FAILURE %d\n", CL_MEM_OBJECT_ALLOCATION_FAILURE);
-						printf("CL_INVALID_OPERATION %d\n", CL_INVALID_OPERATION);
-						printf("CL_INVALID_VALUE %d\n", CL_INVALID_VALUE);
-						printf("CL_OUT_OF_RESOURCES %d\n", CL_OUT_OF_RESOURCES);
-						printf("CL_OUT_OF_HOST_MEMORY %d\n", CL_OUT_OF_HOST_MEMORY);
 						exit(-1);
 					}
-				}
 #endif	
+				}
 			}
 
 		}

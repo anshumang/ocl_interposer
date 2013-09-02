@@ -1178,7 +1178,90 @@ cl_int clSetKernelArg (cl_kernel kernel, cl_uint arg_index,size_t arg_size, cons
 
 cl_int clEnqueueWriteBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bool blocking_write, size_t offset, size_t size,const void *ptr, cl_uint num_events_in_wait_list,const cl_event *event_wait_list, cl_event *event){
 
-	return CL_SUCCESS;
+	cl_int err = CL_SUCCESS;
+	char *mem_node;
+
+	cl_command_queue_ *command_queue_distr = (cl_command_queue_ *)command_queue;
+	char *command_queue_node = command_queue_distr->node;
+	cl_command_queue command_queue_clhandle = command_queue_distr->clhandle;
+
+	cl_mem_ *mem_distr = (cl_mem_ *)buffer;
+
+	int node_match_index = 0;
+	for(int i=0; i<mem_distr->num_mem_tuples; i++){
+
+		mem_node = mem_distr->mem_tuples[i].node;
+
+		if(mem_node != command_queue_node){
+			continue;
+		}
+
+		node_match_index = i;
+		break;
+
+	}
+
+	assert(mem_node == command_queue_node);
+
+	cl_mem mem_clhandle = mem_distr->mem_tuples[node_match_index].clhandle;
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_enqueue_write_buffer;
+	xdr_ret = (xdrproc_t)_xdr_enqueue_write_buffer;
+
+	enqueue_write_buffer_ arg_pkt, ret_pkt;
+	memset((char *)&arg_pkt, 0, sizeof(enqueue_write_buffer_));
+	memset((char *)&ret_pkt, 0, sizeof(enqueue_write_buffer_));
+
+	arg_pkt.mem = (unsigned long)mem_clhandle;
+	arg_pkt.command_queue = (unsigned long)command_queue_clhandle;
+
+	arg_pkt.blocking = blocking_write;
+	arg_pkt.size = size;
+	arg_pkt.offset = offset;
+
+	arg_pkt.data.buff_ptr = (char *)ptr;
+	arg_pkt.data.buff_len = size;
+
+	register CLIENT *clnt;
+	int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+	struct hostent *hp;
+	struct sockaddr_in server_addr;
+
+	/* get the internet address of RPC server */
+	if ((hp = gethostbyname(command_queue_node)) == NULL){
+		printf("Can't get address for %s\n",command_queue_node);
+		exit (-1);
+	}
+
+	bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = 0;
+
+	/* create TCP handle */
+	if ((clnt = clnttcp_create(&server_addr, ENQUEUE_WRITE_BUFFER_PROG, ENQUEUE_WRITE_BUFFER_VERS,
+					&sock, 0, 0)) == NULL){
+		clnt_pcreateerror("clnttcp_create");
+		exit(-1);
+	}
+
+	printf("[clEnqueueWriteBuffer interposed]clnttcp_create OK\n");
+
+	enum clnt_stat cs;
+	struct timeval  total_timeout;
+	total_timeout.tv_sec = 10;
+	total_timeout.tv_usec = 0;
+
+	cs=clnt_call(clnt, ENQUEUE_WRITE_BUFFER, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+	if ( cs != RPC_SUCCESS){
+		printf("clnt_call failed \n");
+	}
+
+	printf("[clEnqueueWriteBuffer interposed] err returned %p\n", ret_pkt.err);
+
+	err = ret_pkt.err;
+	return err;
 
 }
 

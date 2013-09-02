@@ -1,46 +1,46 @@
-#define GET_PLATFORM_IDS_PROG 0x1E000000
+#define GET_PLATFORM_IDS_PROG 0x4F000000
 #define GET_PLATFORM_IDS_VERS 1
 #define GET_PLATFORM_IDS 0x1
 
-#define GET_DEVICE_IDS_PROG 0x01E00000
+#define GET_DEVICE_IDS_PROG 0x04F00000
 #define GET_DEVICE_IDS_VERS 1
 #define GET_DEVICE_IDS 0x2
 
-#define CREATE_CONTEXT_PROG 0x001E0000
+#define CREATE_CONTEXT_PROG 0x004F0000
 #define CREATE_CONTEXT_VERS 1
 #define CREATE_CONTEXT 0x3
 
-#define CREATE_COMMAND_QUEUE_PROG 0x0001E000
+#define CREATE_COMMAND_QUEUE_PROG 0x0004F000
 #define CREATE_COMMAND_QUEUE_VERS 1
 #define CREATE_COMMAND_QUEUE 0x4
 
-#define CREATE_BUFFER_PROG 0x00001E00
+#define CREATE_BUFFER_PROG 0x00004F00
 #define CREATE_BUFFER_VERS 1
 #define CREATE_BUFFER 0x5
 
-#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00002900
+#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x00004F00
 #define CREATE_PROGRAM_WITH_SOURCE_VERS 1
 #define CREATE_PROGRAM_WITH_SOURCE 0x6
 
-#define BUILD_PROGRAM_PROG 0x00000290
+#define BUILD_PROGRAM_PROG 0x000004F0
 #define BUILD_PROGRAM_VERS 1
 #define BUILD_PROGRAM 0x7
 
-#define CREATE_KERNEL_PROG 0x0000000D
+#define CREATE_KERNEL_PROG 0x0000004F
 #define CREATE_KERNEL_VERS 1
 #define CREATE_KERNEL 0x8
 
-#define SET_KERNEL_ARG_PROG 0x10000008
+#define SET_KERNEL_ARG_PROG 0x2000000F
 #define SET_KERNEL_ARG_VERS 1
 #define SET_KERNEL_ARG 0x9
 
-#define ENQUEUE_READ_BUFFER_PROG 0x01000004
-#define ENQUEUE_READ_BUFFER_VERS 1
-#define ENQUEUE_READ_BUFFER 0xA
-
-#define ENQUEUE_WRITE_BUFFER_PROG 0x00100004
+#define ENQUEUE_WRITE_BUFFER_PROG 0x00100001
 #define ENQUEUE_WRITE_BUFFER_VERS 1
 #define ENQUEUE_WRITE_BUFFER 0xB
+
+#define ENQUEUE_READ_BUFFER_PROG 0x01000005
+#define ENQUEUE_READ_BUFFER_VERS 1
+#define ENQUEUE_READ_BUFFER 0xA
 
 #define ENQUEUE_NDRANGE_KERNEL_PROG 0x00010004
 #define ENQUEUE_NDRANGE_KERNEL_VERS 1
@@ -506,3 +506,45 @@ bool_t _xdr_set_kernel_arg(XDR *xdrs, set_kernel_arg_ *objp){
 	return TRUE;
 }
 
+typedef struct enqueue_write_buffer_xdr {
+	unsigned long mem; //Client to Server
+	unsigned long command_queue; //C2S
+	int blocking; //C2S
+	unsigned long size; //C2S
+	unsigned long offset; //C2S
+	buff_xdr_ data; //C2S
+	int err; //Server to Client
+} enqueue_write_buffer_;
+
+bool_t _xdr_enqueue_write_buffer(XDR *xdrs, enqueue_write_buffer_ *objp){
+
+	if(!xdr_u_long(xdrs, &(objp->mem))){
+		return FALSE;
+	}
+
+	if(!xdr_u_long(xdrs, &(objp->command_queue))){
+		return FALSE;
+	}
+
+	if(!xdr_int(xdrs, &(objp->blocking))){
+		return FALSE;
+	}
+
+	if(!xdr_u_long(xdrs, &(objp->size))){
+		return FALSE;
+	}
+
+	if(!xdr_u_long(xdrs, &(objp->offset))){
+		return FALSE;
+	}
+
+	if (!xdr_bytes (xdrs, (char **)&objp->data.buff_ptr, (u_int *) &objp->data.buff_len, ~0)){
+		return FALSE;
+	}
+
+	if(!xdr_int(xdrs, &(objp->err))){
+		return FALSE;
+	}
+
+	return TRUE;
+}

@@ -656,6 +656,62 @@ void clSetKernelArg_server_wrapper(struct svc_req *rqstp, register SVCXPRT *tran
         return;
 }
 
+void clEnqueueWriteBuffer_server(enqueue_write_buffer_ *argp, enqueue_write_buffer_ *retp){
+
+	cl_int err = CL_SUCCESS;
+
+        printf("[clCreateCommandQueue_server] mem %p\n", argp->mem);
+        printf("[clCreateCommandQueue_server] command queue %p\n", argp->command_queue);
+
+        err  = clEnqueueWriteBuffer((cl_command_queue)(argp->command_queue), (cl_mem)(argp->mem), argp->blocking, argp->offset, argp->size, (void *)(argp->data.buff_ptr), 0, NULL, NULL);
+
+        if(err != CL_SUCCESS){
+                printf("clEnqueueWriteBuffer failed with err %d\n", err);
+                exit(-1);
+        }
+	retp->err = err;
+
+        printf("[clEnqueueWriteBuffer_server]err returned %d\n", retp->err);
+
+}
+
+void clEnqueueWriteBuffer_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_enqueue_write_buffer;
+	xdr_ret = (xdrproc_t)_xdr_enqueue_write_buffer;
+
+	enqueue_write_buffer_ arg_pkt, ret_pkt;
+
+	memset((char *)&arg_pkt, 0, sizeof(enqueue_write_buffer_));
+	memset((char *)&ret_pkt, 0, sizeof(enqueue_write_buffer_));
+
+	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
+		svcerr_decode(transp);
+		exit(-1);
+	}
+	printf("[clEnqueueWriteBuffer_server_wrapper] svc_getargs OK\n");
+
+	clEnqueueWriteBuffer_server(&arg_pkt, &ret_pkt);	
+	printf("[clEnqueueWriteBuffer_server_wrapper] clCall_server OK\n");
+
+        if (!svc_sendreply(transp, (xdrproc_t) xdr_ret, (char *)&ret_pkt)) {
+                svcerr_systemerr (transp);
+		exit(-1);
+        }
+	printf("[clEnqueueWriteBuffer_server_wrapper] svc_sendreply OK\n");
+
+        if (!svc_freeargs (transp, (xdrproc_t) xdr_arg, (caddr_t) &arg_pkt)) {
+                printf ("%s", "unable to free arguments");
+                exit (-1);
+        }
+	printf("[clEnqueueWriteBuffer_server_wrapper] svc_freeargs OK\n");
+
+        return;
+
+}
+
 int main(){
 
         SVCXPRT *transp;
@@ -762,6 +818,16 @@ int main(){
         }
 
 	printf("[main] svctcp_register SET_KERNEL_ARG_PROG OK\n");
+
+        svc_unregister(ENQUEUE_WRITE_BUFFER_PROG, ENQUEUE_WRITE_BUFFER_VERS);
+
+        if (!svc_register(transp, ENQUEUE_WRITE_BUFFER_PROG, ENQUEUE_WRITE_BUFFER_VERS,clEnqueueWriteBuffer_server_wrapper, IPPROTO_TCP)) {
+                printf ("%s", "unable to register (ENQUEUE_WRITE_BUFFER_PROG, ENQUEUE_WRITE_BUFFER_VERS, tcp).");
+                exit(-1);
+        }
+
+        printf("[main] svctcp_register ENQUEUE_WRITE_BUFFER_PROG OK\n");
+
 	svc_run();
 
 	printf("[main] this message should be unreachable");
