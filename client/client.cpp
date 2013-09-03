@@ -1273,7 +1273,7 @@ cl_int clEnqueueWriteBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bo
 
 }
 
-cl_int clEnqueueReadBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bool blocking_read, size_t offset, size_t size,const void *ptr, cl_uint num_events_in_wait_list,const cl_event *event_wait_list, cl_event *event){
+cl_int clEnqueueReadBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bool blocking_read, size_t offset, size_t size,  void *ptr, cl_uint num_events_in_wait_list,const cl_event *event_wait_list, cl_event *event){
 
 	printf("[clEnqueueReadBuffer interposed] started...\n");
 
@@ -1468,5 +1468,11 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue, cl_kernel kernel,
 
 	err = ret_pkt.err;
 	return err;
+
+}
+
+cl_int clFinish(cl_command_queue command_queue){
+
+	return CL_SUCCESS;
 
 }
