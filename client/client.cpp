@@ -575,6 +575,8 @@ cl_mem clCreateBuffer (cl_context context, cl_mem_flags flags, size_t size, void
 
 		mem_distr->mem_tuples[i].clhandle = (cl_mem)(ret_pkt.mem);
 		mem_distr->mem_tuples[i].node = node;
+		printf("[clCreateBuffer interposed] mem_distr->mem_tuples[%d].clhandle %p\n",i, mem_distr->mem_tuples[i].clhandle);
+		printf("[clCreateBuffer interposed] mem_distr->mem_tuples[%d].node %s\n",i, mem_distr->mem_tuples[i].node);
 		err |= ret_pkt.err;
 
 	}
@@ -1186,11 +1188,14 @@ cl_int clEnqueueWriteBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bo
 	cl_command_queue command_queue_clhandle = command_queue_distr->clhandle;
 
 	cl_mem_ *mem_distr = (cl_mem_ *)buffer;
+	printf("[clEnqueueWriteBuffer interposed] mem_distr %p\n", mem_distr);
 
 	int node_match_index = 0;
 	for(int i=0; i<mem_distr->num_mem_tuples; i++){
 
 		mem_node = mem_distr->mem_tuples[i].node;
+		printf("[clEnqueueWriteBuffer interposed] mem_distr->mem_tuples[%d].node %s\n", i, mem_distr->mem_tuples[i].node);
+		printf("[clEnqueueWriteBuffer interposed] mem_distr->mem_tuples[%d].clhandle %p\n", i, mem_distr->mem_tuples[i].clhandle);
 
 		if(mem_node != command_queue_node){
 			continue;
@@ -1204,6 +1209,7 @@ cl_int clEnqueueWriteBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bo
 	assert(mem_node == command_queue_node);
 
 	cl_mem mem_clhandle = mem_distr->mem_tuples[node_match_index].clhandle;
+	printf("[clEnqueueWriteBuffer interposed] mem_clhandle %p\n", mem_clhandle);
 
 	xdrproc_t xdr_arg, xdr_ret;
 
@@ -1223,6 +1229,8 @@ cl_int clEnqueueWriteBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bo
 
 	arg_pkt.data.buff_ptr = (char *)ptr;
 	arg_pkt.data.buff_len = size;
+
+	ret_pkt.data.buff_ptr = NULL;
 
 	register CLIENT *clnt;
 	int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
@@ -1258,7 +1266,7 @@ cl_int clEnqueueWriteBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bo
 		printf("clnt_call failed \n");
 	}
 
-	printf("[clEnqueueWriteBuffer interposed] err returned %p\n", ret_pkt.err);
+	printf("[clEnqueueWriteBuffer interposed] err returned %d\n", ret_pkt.err);
 
 	err = ret_pkt.err;
 	return err;
@@ -1267,12 +1275,198 @@ cl_int clEnqueueWriteBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bo
 
 cl_int clEnqueueReadBuffer (cl_command_queue command_queue, cl_mem buffer,cl_bool blocking_read, size_t offset, size_t size,const void *ptr, cl_uint num_events_in_wait_list,const cl_event *event_wait_list, cl_event *event){
 
-	return CL_SUCCESS;
+	printf("[clEnqueueReadBuffer interposed] started...\n");
+
+	cl_int err = CL_SUCCESS;
+	char *mem_node;
+
+	cl_command_queue_ *command_queue_distr = (cl_command_queue_ *)command_queue;
+	char *command_queue_node = command_queue_distr->node;
+	cl_command_queue command_queue_clhandle = command_queue_distr->clhandle;
+
+	cl_mem_ *mem_distr = (cl_mem_ *)buffer;
+	printf("[clEnqueueReadBuffer interposed] mem_distr %p\n", mem_distr);
+
+	int node_match_index = 0;
+	for(int i=0; i<mem_distr->num_mem_tuples; i++){
+
+		mem_node = mem_distr->mem_tuples[i].node;
+		printf("[clEnqueueReadBuffer interposed] mem_distr->mem_tuples[%d].node %s\n", i, mem_distr->mem_tuples[i].node);
+		printf("[clEnqueueReadBuffer interposed] mem_distr->mem_tuples[%d].clhandle %p\n", i, mem_distr->mem_tuples[i].clhandle);
+
+		if(mem_node != command_queue_node){
+			continue;
+		}
+
+		node_match_index = i;
+		break;
+
+	}
+
+	assert(mem_node == command_queue_node);
+
+	cl_mem mem_clhandle = mem_distr->mem_tuples[node_match_index].clhandle;
+	printf("[clEnqueueReadBuffer interposed] mem_clhandle %p\n", mem_clhandle);
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_enqueue_read_buffer;
+	xdr_ret = (xdrproc_t)_xdr_enqueue_read_buffer;
+
+	enqueue_read_buffer_ arg_pkt, ret_pkt;
+	memset((char *)&arg_pkt, 0, sizeof(enqueue_read_buffer_));
+	memset((char *)&ret_pkt, 0, sizeof(enqueue_read_buffer_));
+
+	arg_pkt.mem = (unsigned long)mem_clhandle;
+	arg_pkt.command_queue = (unsigned long)command_queue_clhandle;
+
+	arg_pkt.blocking = blocking_read;
+	arg_pkt.size = size;
+	arg_pkt.offset = offset;
+
+	arg_pkt.data.buff_ptr = "\0";
+	arg_pkt.data.buff_len = sizeof(char);
+
+	ret_pkt.data.buff_ptr = NULL;
+
+	register CLIENT *clnt;
+	int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+	struct hostent *hp;
+	struct sockaddr_in server_addr;
+
+	/* get the internet address of RPC server */
+	if ((hp = gethostbyname(command_queue_node)) == NULL){
+		printf("Can't get address for %s\n",command_queue_node);
+		exit (-1);
+	}
+
+	bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = 0;
+
+	/* create TCP handle */
+	if ((clnt = clnttcp_create(&server_addr, ENQUEUE_READ_BUFFER_PROG, ENQUEUE_READ_BUFFER_VERS,
+					&sock, 0, 0)) == NULL){
+		clnt_pcreateerror("clnttcp_create");
+		exit(-1);
+	}
+
+	printf("[clEnqueueReadBuffer interposed]clnttcp_create OK\n");
+
+	enum clnt_stat cs;
+	struct timeval  total_timeout;
+	total_timeout.tv_sec = 10;
+	total_timeout.tv_usec = 0;
+
+	cs=clnt_call(clnt, ENQUEUE_READ_BUFFER, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+	if ( cs != RPC_SUCCESS){
+		printf("clnt_call failed \n");
+	}
+
+	printf("[clEnqueueReadBuffer interposed] err returned %d\n", ret_pkt.err);
+
+	err = ret_pkt.err;
+	return err;
 
 }
 
 cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue, cl_kernel kernel, cl_uint work_dim, const size_t *global_work_offset, const size_t *global_work_size, const size_t *local_work_size, cl_uint num_events_in_wait_list, const cl_event *event_wait_list, cl_event *event){
 
-	return CL_SUCCESS;
+	cl_int err = CL_SUCCESS;
+	char *kernel_node;
+
+	cl_command_queue_ *command_queue_distr = (cl_command_queue_ *)command_queue;
+	char *command_queue_node = command_queue_distr->node;
+	cl_command_queue command_queue_clhandle = command_queue_distr->clhandle;
+
+	cl_kernel_ *kernel_distr = (cl_kernel_ *)kernel;
+	printf("[clEnqueueNDRangeKernel interposed] kernel_distr %p\n", kernel_distr);
+
+	int node_match_index = 0;
+	for(int i=0; i<kernel_distr->num_kernel_tuples; i++){
+
+		kernel_node = kernel_distr->kernel_tuples[i].node;
+		printf("[clEnqueueNDRangeKernel interposed] kernel_distr->kernel_tuples[%d].node %s\n", i, kernel_distr->kernel_tuples[i].node);
+		printf("[clEnqueueNDRangeKernel interposed] kernel_distr->kernel_tuples[%d].clhandle %p\n", i, kernel_distr->kernel_tuples[i].clhandle);
+
+		if(kernel_node != command_queue_node){
+			continue;
+		}
+
+		node_match_index = i;
+		break;
+
+	}
+
+	assert(kernel_node == command_queue_node);
+
+	cl_kernel kernel_clhandle = kernel_distr->kernel_tuples[node_match_index].clhandle;
+	printf("[clEnqueueNDRangeKernel interposed] kernel_clhandle %p\n", kernel_clhandle);
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_enqueue_ndrange_kernel;
+	xdr_ret = (xdrproc_t)_xdr_enqueue_ndrange_kernel;
+
+	enqueue_ndrange_kernel_ arg_pkt, ret_pkt;
+	memset((char *)&arg_pkt, 0, sizeof(enqueue_ndrange_kernel_));
+	memset((char *)&ret_pkt, 0, sizeof(enqueue_ndrange_kernel_));
+
+	arg_pkt.kernel = (unsigned long)kernel_clhandle;
+	arg_pkt.command_queue = (unsigned long)command_queue_clhandle;
+
+	arg_pkt.work_dim = work_dim;
+
+	arg_pkt.global_offset.buff_ptr = (char *)global_work_offset;
+	arg_pkt.global_offset.buff_len = sizeof(size_t) * work_dim;
+
+	arg_pkt.global_size.buff_ptr = (char *)global_work_size;
+	arg_pkt.global_size.buff_len = sizeof(size_t) * work_dim;
+
+	arg_pkt.local_size.buff_ptr = (char *)local_work_size;
+	arg_pkt.local_size.buff_len = sizeof(size_t) * work_dim;
+
+	ret_pkt.global_offset.buff_ptr = NULL;	
+	ret_pkt.global_size.buff_ptr = NULL;	
+	ret_pkt.local_size.buff_ptr = NULL;	
+
+	register CLIENT *clnt;
+	int sock = RPC_ANYSOCK; /* can be also valid socket descriptor */
+	struct hostent *hp;
+	struct sockaddr_in server_addr;
+
+	/* get the internet address of RPC server */
+	if ((hp = gethostbyname(command_queue_node)) == NULL){
+		printf("Can't get address for %s\n",command_queue_node);
+		exit (-1);
+	}
+
+	bcopy(hp->h_addr, (caddr_t)&server_addr.sin_addr.s_addr, hp->h_length);
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = 0;
+
+	/* create TCP handle */
+	if ((clnt = clnttcp_create(&server_addr, ENQUEUE_NDRANGE_KERNEL_PROG, ENQUEUE_NDRANGE_KERNEL_VERS,
+					&sock, 0, 0)) == NULL){
+		clnt_pcreateerror("clnttcp_create");
+		exit(-1);
+	}
+
+	printf("[clEnqueueNDRangeKernel interposed]clnttcp_create OK\n");
+
+	enum clnt_stat cs;
+	struct timeval  total_timeout;
+	total_timeout.tv_sec = 10;
+	total_timeout.tv_usec = 0;
+
+	cs=clnt_call(clnt, ENQUEUE_NDRANGE_KERNEL, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
+	if ( cs != RPC_SUCCESS){
+		printf("clnt_call failed \n");
+	}
+
+	printf("[clEnqueueNDRangeKernel interposed] err returned %d\n", ret_pkt.err);
+
+	err = ret_pkt.err;
+	return err;
 
 }

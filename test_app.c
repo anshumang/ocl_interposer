@@ -157,7 +157,6 @@ int main(){
 				cl_kernel kern;
 
 				kern = clCreateKernel(prog, "helloworld", &err);
-				printf("CL_INVALID_KERNEL_NAME %d\n",CL_INVALID_KERNEL_NAME);
 				if(err != CL_SUCCESS){
                                         printf("clCreateKernel failed with err %d\n", err);
                                         exit(-1);
@@ -208,7 +207,7 @@ int main(){
 						exit(-1);
 					}
 
-#if 0
+#if 1
 					size_t global_work_offset[work_dim], global_work_size[work_dim], local_work_size[work_dim];
 					for(int k=0; k<work_dim; k++){
 						global_work_offset[k] = 0;
@@ -222,13 +221,13 @@ int main(){
 						printf("CL_INVALID_KERNEL_ARGS %d\n", CL_INVALID_KERNEL_ARGS);
 						exit(-1);
 					}
+#endif	
 
 					err = clEnqueueReadBuffer(cmd_q[j], mem_out, CL_TRUE, 0, size_g, host_ptr, 0, NULL, NULL);
 					if(err != CL_SUCCESS){
 						printf("clEnqueueReadBuffer failed with err %d\n", err);
 						exit(-1);
 					}
-#endif	
 				}
 			}
 

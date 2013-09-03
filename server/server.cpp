@@ -660,8 +660,8 @@ void clEnqueueWriteBuffer_server(enqueue_write_buffer_ *argp, enqueue_write_buff
 
 	cl_int err = CL_SUCCESS;
 
-        printf("[clCreateCommandQueue_server] mem %p\n", argp->mem);
-        printf("[clCreateCommandQueue_server] command queue %p\n", argp->command_queue);
+        printf("[clEnqueueWriteBuffer_server] mem %p\n", argp->mem);
+        printf("[clEnqueueWriteBuffer_server] command queue %p\n", argp->command_queue);
 
         err  = clEnqueueWriteBuffer((cl_command_queue)(argp->command_queue), (cl_mem)(argp->mem), argp->blocking, argp->offset, argp->size, (void *)(argp->data.buff_ptr), 0, NULL, NULL);
 
@@ -670,6 +670,9 @@ void clEnqueueWriteBuffer_server(enqueue_write_buffer_ *argp, enqueue_write_buff
                 exit(-1);
         }
 	retp->err = err;
+
+	retp->data.buff_ptr = "\0";
+	retp->data.buff_len = sizeof(char);
 
         printf("[clEnqueueWriteBuffer_server]err returned %d\n", retp->err);
 
@@ -686,6 +689,8 @@ void clEnqueueWriteBuffer_server_wrapper(struct svc_req *rqstp, register SVCXPRT
 
 	memset((char *)&arg_pkt, 0, sizeof(enqueue_write_buffer_));
 	memset((char *)&ret_pkt, 0, sizeof(enqueue_write_buffer_));
+
+	arg_pkt.data.buff_ptr = NULL;
 
 	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
 		svcerr_decode(transp);
@@ -707,6 +712,137 @@ void clEnqueueWriteBuffer_server_wrapper(struct svc_req *rqstp, register SVCXPRT
                 exit (-1);
         }
 	printf("[clEnqueueWriteBuffer_server_wrapper] svc_freeargs OK\n");
+
+        return;
+
+}
+
+void clEnqueueNDRangeKernel_server(enqueue_ndrange_kernel_ *argp, enqueue_ndrange_kernel_ *retp){
+
+	cl_int err = CL_SUCCESS;
+
+        printf("[clEnqueueNDRangeKernel_server] kernel %p\n", argp->kernel);
+        printf("[clEnqueueNDRangeKernel_server] command queue %p\n", argp->command_queue);
+
+        err  = clEnqueueNDRangeKernel((cl_command_queue)(argp->command_queue), (cl_kernel)(argp->kernel), argp->work_dim, (const size_t *)(argp->global_offset.buff_ptr), (const size_t *)(argp->global_size.buff_ptr), (const size_t *)(argp->local_size.buff_ptr), 0, NULL, NULL);
+
+        if(err != CL_SUCCESS){
+                printf("clEnqueueNDRangeKernel failed with err %d\n", err);
+                exit(-1);
+        }
+	retp->err = err;
+
+	retp->global_offset.buff_ptr = "\0";
+	retp->global_offset.buff_len = sizeof(char);
+
+	retp->global_size.buff_ptr = "\0";
+	retp->global_size.buff_len = sizeof(char);
+
+	retp->local_size.buff_ptr = "\0";
+	retp->local_size.buff_len = sizeof(char);
+
+        printf("[clEnqueueNDRangeKernel_server]err returned %d\n", retp->err);
+
+}
+
+void clEnqueueNDRangeKernel_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_enqueue_ndrange_kernel;
+	xdr_ret = (xdrproc_t)_xdr_enqueue_ndrange_kernel;
+
+	enqueue_ndrange_kernel_ arg_pkt, ret_pkt;
+
+	memset((char *)&arg_pkt, 0, sizeof(enqueue_ndrange_kernel_));
+	memset((char *)&ret_pkt, 0, sizeof(enqueue_ndrange_kernel_));
+
+	arg_pkt.global_offset.buff_ptr = NULL;
+	arg_pkt.global_size.buff_ptr = NULL;
+	arg_pkt.local_size.buff_ptr = NULL;
+
+	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
+		svcerr_decode(transp);
+		exit(-1);
+	}
+	printf("[clEnqueueNDRangeKernel_server_wrapper] svc_getargs OK\n");
+
+	clEnqueueNDRangeKernel_server(&arg_pkt, &ret_pkt);	
+	printf("[clEnqueueNDRangeKernel_server_wrapper] clCall_server OK\n");
+
+        if (!svc_sendreply(transp, (xdrproc_t) xdr_ret, (char *)&ret_pkt)) {
+                svcerr_systemerr (transp);
+		exit(-1);
+        }
+	printf("[clEnqueueNDRangeKernel_server_wrapper] svc_sendreply OK\n");
+
+        if (!svc_freeargs (transp, (xdrproc_t) xdr_arg, (caddr_t) &arg_pkt)) {
+                printf ("%s", "unable to free arguments");
+                exit (-1);
+        }
+	printf("[clEnqueueNDRangeKernel_server_wrapper] svc_freeargs OK\n");
+
+        return;
+
+}
+
+void clEnqueueReadBuffer_server(enqueue_read_buffer_ *argp, enqueue_read_buffer_ *retp){
+
+	cl_int err = CL_SUCCESS;
+
+        printf("[clEnqueueReadBuffer_server] mem %p\n", argp->mem);
+        printf("[clEnqueueReadBuffer_server] command queue %p\n", argp->command_queue);
+
+	void *ptr = malloc(argp->size);
+        err  = clEnqueueReadBuffer((cl_command_queue)(argp->command_queue), (cl_mem)(argp->mem), argp->blocking, argp->offset, argp->size, ptr, 0, NULL, NULL);
+
+        if(err != CL_SUCCESS){
+                printf("clEnqueueReadBuffer failed with err %d\n", err);
+                exit(-1);
+        }
+	retp->err = err;
+
+	retp->data.buff_ptr = (char *)ptr;
+	retp->data.buff_len = argp->size;
+
+        printf("[clEnqueueReadBuffer_server]err returned %d\n", retp->err);
+
+}
+
+void clEnqueueReadBuffer_server_wrapper(struct svc_req *rqstp, register SVCXPRT *transp){
+
+	xdrproc_t xdr_arg, xdr_ret;
+
+	xdr_arg = (xdrproc_t)_xdr_enqueue_read_buffer;
+	xdr_ret = (xdrproc_t)_xdr_enqueue_read_buffer;
+
+	enqueue_read_buffer_ arg_pkt, ret_pkt;
+
+	memset((char *)&arg_pkt, 0, sizeof(enqueue_read_buffer_));
+	memset((char *)&ret_pkt, 0, sizeof(enqueue_read_buffer_));
+
+	arg_pkt.data.buff_ptr = NULL;
+
+	if (!svc_getargs (transp, (xdrproc_t) xdr_arg, (char *) &arg_pkt)) {
+		svcerr_decode(transp);
+		exit(-1);
+	}
+	printf("[clEnqueueReadBuffer_server_wrapper] svc_getargs OK\n");
+
+	clEnqueueReadBuffer_server(&arg_pkt, &ret_pkt);	
+	printf("[clEnqueueReadBuffer_server_wrapper] clCall_server OK\n");
+
+        if (!svc_sendreply(transp, (xdrproc_t) xdr_ret, (char *)&ret_pkt)) {
+                svcerr_systemerr (transp);
+		exit(-1);
+        }
+	printf("[clEnqueueReadBuffer_server_wrapper] svc_sendreply OK\n");
+
+        if (!svc_freeargs (transp, (xdrproc_t) xdr_arg, (caddr_t) &arg_pkt)) {
+                printf ("%s", "unable to free arguments");
+                exit (-1);
+        }
+	printf("[clEnqueueReadBuffer_server_wrapper] svc_freeargs OK\n");
 
         return;
 
@@ -827,6 +963,24 @@ int main(){
         }
 
         printf("[main] svctcp_register ENQUEUE_WRITE_BUFFER_PROG OK\n");
+
+        svc_unregister(ENQUEUE_READ_BUFFER_PROG, ENQUEUE_READ_BUFFER_VERS);
+
+        if (!svc_register(transp, ENQUEUE_READ_BUFFER_PROG, ENQUEUE_READ_BUFFER_VERS,clEnqueueReadBuffer_server_wrapper, IPPROTO_TCP)) {
+                printf ("%s", "unable to register (ENQUEUE_READ_BUFFER_PROG, ENQUEUE_READ_BUFFER_VERS, tcp).");
+                exit(-1);
+        }
+
+        printf("[main] svctcp_register ENQUEUE_READ_BUFFER_PROG OK\n");
+
+        svc_unregister(ENQUEUE_NDRANGE_KERNEL_PROG, ENQUEUE_NDRANGE_KERNEL_VERS);
+
+        if (!svc_register(transp, ENQUEUE_NDRANGE_KERNEL_PROG, ENQUEUE_NDRANGE_KERNEL_VERS,clEnqueueNDRangeKernel_server_wrapper, IPPROTO_TCP)) {
+                printf ("%s", "unable to register (ENQUEUE_NDRANGE_KERNEL_PROG, ENQUEUE_NDRANGE_KERNEL_VERS, tcp).");
+                exit(-1);
+        }
+
+        printf("[main] svctcp_register ENQUEUE_NDRANGE_KERNEL_PROG OK\n");
 
 	svc_run();
 
