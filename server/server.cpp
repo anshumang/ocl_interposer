@@ -518,7 +518,8 @@ void clCreateKernel_server(create_kernel_ *argp, create_kernel_ *retp){
         printf("[clCreateKernel_server] kernel_name %s\n", argp->kernel_name.buff_ptr);
 
         //kernel  = clCreateKernel((cl_program)(argp->program), (const char *)(argp->kernel_name.buff_ptr), &err);
-        kernel  = clCreateKernel((cl_program)(argp->program), "helloworld", &err);
+        kernel  = clCreateKernel((cl_program)(argp->program), "nw_kernel1", &err);
+        //kernel  = clCreateKernel((cl_program)(argp->program), "helloworld", &err);
 
         if(err != CL_SUCCESS){
                 printf("clCreateKernel failed with err %d\n", err);
@@ -724,7 +725,18 @@ void clEnqueueNDRangeKernel_server(enqueue_ndrange_kernel_ *argp, enqueue_ndrang
         printf("[clEnqueueNDRangeKernel_server] kernel %p\n", argp->kernel);
         printf("[clEnqueueNDRangeKernel_server] command queue %p\n", argp->command_queue);
 
-        err  = clEnqueueNDRangeKernel((cl_command_queue)(argp->command_queue), (cl_kernel)(argp->kernel), argp->work_dim, (const size_t *)(argp->global_offset.buff_ptr), (const size_t *)(argp->global_size.buff_ptr), (const size_t *)(argp->local_size.buff_ptr), 0, NULL, NULL);
+	size_t *global_work_offset=NULL, *local_work_size=NULL;
+
+	if(strcmp(argp->global_offset.buff_ptr, "\0")){
+		global_work_offset = (size_t *)argp->global_offset.buff_ptr;
+	}
+
+	if(strcmp(argp->local_size.buff_ptr, "\0")){
+		local_work_size = (size_t *)argp->local_size.buff_ptr;
+	}
+
+        //err  = clEnqueueNDRangeKernel((cl_command_queue)(argp->command_queue), (cl_kernel)(argp->kernel), argp->work_dim, (const size_t *)(argp->global_offset.buff_ptr), (const size_t *)(argp->global_size.buff_ptr), (const size_t *)(argp->local_size.buff_ptr), 0, NULL, NULL);
+        err  = clEnqueueNDRangeKernel((cl_command_queue)(argp->command_queue), (cl_kernel)(argp->kernel), argp->work_dim, (const size_t *)global_work_offset, (const size_t *)(argp->global_size.buff_ptr), (const size_t *)local_work_size, 0, NULL, NULL);
 
         if(err != CL_SUCCESS){
                 printf("clEnqueueNDRangeKernel failed with err %d\n", err);

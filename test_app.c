@@ -153,10 +153,38 @@ int main(){
 					}
                                         exit(-1);
                                 }
+#if 0
+				size_t param_value_size_ret = 0;
+				char *program_source = (char *)malloc(1024);
+				cl_int err_local = clGetProgramInfo(prog, CL_PROGRAM_SOURCE, 1024, program_source, &param_value_size_ret);
+				printf("param_value_size_ret %d\n", param_value_size_ret);
+				printf("program_source %s\n", program_source);
+				size_t *program_bin_size = (size_t *)malloc(sizeof(size_t)*2);
+				err_local = clGetProgramInfo(prog, CL_PROGRAM_BINARY_SIZES, sizeof(size_t)*2, program_bin_size, &param_value_size_ret);
+				printf("param_value_size_ret %d\n", param_value_size_ret);
+				printf("param_value %ld\n", program_bin_size[0]);
+				printf("param_value %ld\n", program_bin_size[1]);
+				unsigned char **program_bins = (unsigned char **)malloc(sizeof(unsigned char *)*2);
+				program_bins[0] = (unsigned char *)malloc(sizeof(unsigned char)*1024);
+				program_bins[1] = (unsigned char *)malloc(sizeof(unsigned char)*1024);
+				err_local = clGetProgramInfo(prog, CL_PROGRAM_BINARIES, sizeof(unsigned char *)*2, program_bins, &param_value_size_ret);
+				printf("param_value_size_ret %d\n", param_value_size_ret);
+				printf("param_value %s\n", program_bins[0]);
+				printf("param_value %s\n", program_bins[1]);
+				if(err_local != CL_SUCCESS){
+					printf("err_local %d\n", err_local);
+					printf("CL_INVALID_VALUE %d\n", CL_INVALID_VALUE);
+				}
+#endif
 
 				cl_kernel kern;
 
 				kern = clCreateKernel(prog, "helloworld", &err);
+				printf("CL_INVALID_PROGRAM %d\n", CL_INVALID_PROGRAM);
+				printf("CL_INVALID_PROGRAM_EXECUTABLE %d\n", CL_INVALID_PROGRAM_EXECUTABLE);
+				printf("CL_INVALID_KERNEL_NAME %d\n", CL_INVALID_KERNEL_NAME);
+				printf("CL_INVALID_KERNEL_DEFINITION %d\n", CL_INVALID_KERNEL_DEFINITION);
+				printf("CL_INVALID_VALUE %d\n", CL_INVALID_VALUE);
 				if(err != CL_SUCCESS){
                                         printf("clCreateKernel failed with err %d\n", err);
                                         exit(-1);

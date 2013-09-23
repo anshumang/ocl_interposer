@@ -1,48 +1,48 @@
-#define GET_PLATFORM_IDS_PROG 0xFF000000
+#define GET_PLATFORM_IDS_PROG 0xFF000004
 #define GET_PLATFORM_IDS_VERS 1
 #define GET_PLATFORM_IDS 0x1
 
-#define GET_DEVICE_IDS_PROG 0x0FF00000
+#define GET_DEVICE_IDS_PROG 0x0FF00004
 #define GET_DEVICE_IDS_VERS 1
 #define GET_DEVICE_IDS 0x2
 
-#define CREATE_CONTEXT_PROG 0x00FF0000
+#define CREATE_CONTEXT_PROG 0x00FF0004
 #define CREATE_CONTEXT_VERS 1
 #define CREATE_CONTEXT 0x3
 
-#define CREATE_COMMAND_QUEUE_PROG 0x000FF000
+#define CREATE_COMMAND_QUEUE_PROG 0x000FF004
 #define CREATE_COMMAND_QUEUE_VERS 1
 #define CREATE_COMMAND_QUEUE 0x4
 
-#define CREATE_BUFFER_PROG 0x0000FF00
+#define CREATE_BUFFER_PROG 0x0000FF04
 #define CREATE_BUFFER_VERS 1
 #define CREATE_BUFFER 0x5
 
-#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x000000FF0
+#define CREATE_PROGRAM_WITH_SOURCE_PROG 0x000000FF4
 #define CREATE_PROGRAM_WITH_SOURCE_VERS 1
 #define CREATE_PROGRAM_WITH_SOURCE 0x6
 
-#define BUILD_PROGRAM_PROG 0x000000FF
+#define BUILD_PROGRAM_PROG 0x400000FF
 #define BUILD_PROGRAM_VERS 1
 #define BUILD_PROGRAM 0x7
 
-#define CREATE_KERNEL_PROG 0xAA000000
+#define CREATE_KERNEL_PROG 0xAA000004
 #define CREATE_KERNEL_VERS 1
 #define CREATE_KERNEL 0x8
 
-#define SET_KERNEL_ARG_PROG 0x0AA00000
+#define SET_KERNEL_ARG_PROG 0x0AA00004
 #define SET_KERNEL_ARG_VERS 1
 #define SET_KERNEL_ARG 0x9
 
-#define ENQUEUE_WRITE_BUFFER_PROG 0x00AA0000
+#define ENQUEUE_WRITE_BUFFER_PROG 0x00AA0004
 #define ENQUEUE_WRITE_BUFFER_VERS 1
 #define ENQUEUE_WRITE_BUFFER 0xA
 
-#define ENQUEUE_READ_BUFFER_PROG 0x000AA000
+#define ENQUEUE_READ_BUFFER_PROG 0x000AA004
 #define ENQUEUE_READ_BUFFER_VERS 1
 #define ENQUEUE_READ_BUFFER 0xB
 
-#define ENQUEUE_NDRANGE_KERNEL_PROG 0x0000AA00
+#define ENQUEUE_NDRANGE_KERNEL_PROG 0x0000AA04
 #define ENQUEUE_NDRANGE_KERNEL_VERS 1
 #define ENQUEUE_NDRANGE_KERNEL 0xC
 
@@ -397,10 +397,16 @@ bool_t _xdr_create_kernel(XDR *xdrs, create_kernel_ *objp){
 		return FALSE;
 	}
 
+	if(xdrs->x_op == XDR_ENCODE){
+		printf("[_xdr_create_kernel] XDR_ENCODE kernel_name %s\n", objp->kernel_name.buff_ptr);
+	}
 	if (!xdr_bytes (xdrs, (char **)&objp->kernel_name.buff_ptr, (u_int *) &objp->kernel_name.buff_len, ~0)){
 		return FALSE;
 	}
 
+	if(xdrs->x_op == XDR_DECODE){
+		printf("[_xdr_create_kernel] XDR_DECODE kernel_name %s\n", objp->kernel_name.buff_ptr);
+	}
 	if(!xdr_u_long(xdrs, &(objp->kernel))){
 		return FALSE;
 	}

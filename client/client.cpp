@@ -1018,6 +1018,7 @@ cl_kernel clCreateKernel (cl_program program,const char *kernel_name, cl_int *er
 		total_timeout.tv_sec = 10;
 		total_timeout.tv_usec = 0;
 
+		printf("[clCreateKernel interposed] kernel_name %s\n", arg_pkt.kernel_name.buff_ptr);
 		cs=clnt_call(clnt, CREATE_KERNEL, (xdrproc_t) xdr_arg, (char *) &arg_pkt, (xdrproc_t) xdr_ret,(char *) &ret_pkt, total_timeout);
 		if ( cs != RPC_SUCCESS){
 			printf("clnt_call failed \n");
@@ -1417,14 +1418,24 @@ cl_int clEnqueueNDRangeKernel (cl_command_queue command_queue, cl_kernel kernel,
 
 	arg_pkt.work_dim = work_dim;
 
-	arg_pkt.global_offset.buff_ptr = (char *)global_work_offset;
-	arg_pkt.global_offset.buff_len = sizeof(size_t) * work_dim;
+	if(global_work_offset){
+		arg_pkt.global_offset.buff_ptr = (char *)global_work_offset;
+		arg_pkt.global_offset.buff_len = sizeof(size_t) * work_dim;
+	}else{
+		arg_pkt.global_offset.buff_ptr = "\0";
+		arg_pkt.global_offset.buff_len = sizeof(char);
+	}
 
 	arg_pkt.global_size.buff_ptr = (char *)global_work_size;
 	arg_pkt.global_size.buff_len = sizeof(size_t) * work_dim;
 
-	arg_pkt.local_size.buff_ptr = (char *)local_work_size;
-	arg_pkt.local_size.buff_len = sizeof(size_t) * work_dim;
+	if(local_work_size){
+		arg_pkt.local_size.buff_ptr = (char *)local_work_size;
+		arg_pkt.local_size.buff_len = sizeof(size_t) * work_dim;
+	}else{
+		arg_pkt.local_size.buff_ptr = "\0";
+		arg_pkt.local_size.buff_len = sizeof(char);
+	}
 
 	ret_pkt.global_offset.buff_ptr = NULL;	
 	ret_pkt.global_size.buff_ptr = NULL;	
