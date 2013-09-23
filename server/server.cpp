@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "CL/opencl.h"
 #include <rpc/rpc.h>
+#include <rpc/pmap_clnt.h>
 #include <sys/socket.h>
 #include "../client_server_common_includes.h"
 #include <assert.h>
@@ -517,8 +518,8 @@ void clCreateKernel_server(create_kernel_ *argp, create_kernel_ *retp){
         printf("[clCreateKernel_server] program %p\n", argp->program);
         printf("[clCreateKernel_server] kernel_name %s\n", argp->kernel_name.buff_ptr);
 
-        //kernel  = clCreateKernel((cl_program)(argp->program), (const char *)(argp->kernel_name.buff_ptr), &err);
-        kernel  = clCreateKernel((cl_program)(argp->program), "nw_kernel1", &err);
+        kernel  = clCreateKernel((cl_program)(argp->program), (const char *)(argp->kernel_name.buff_ptr), &err);
+        //kernel  = clCreateKernel((cl_program)(argp->program), "nw_kernel1", &err);
         //kernel  = clCreateKernel((cl_program)(argp->program), "helloworld", &err);
 
         if(err != CL_SUCCESS){
@@ -887,6 +888,7 @@ int main(){
 	//printf("pmap_unset OK\n");
 
 	svc_unregister(GET_PLATFORM_IDS_PROG, GET_PLATFORM_IDS_VERS);
+	pmap_unset(GET_PLATFORM_IDS_PROG, GET_PLATFORM_IDS_VERS);
 
         if (!svc_register(transp, GET_PLATFORM_IDS_PROG, GET_PLATFORM_IDS_VERS,clGetPlatformIDs_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (GET_PLATFORM_IDS_PROG, GET_PLATFORM_IDS_VERS, tcp).");
@@ -896,6 +898,7 @@ int main(){
 	printf("[main] svctcp_register GET_PLATFORM_IDS_PROG OK\n");
 
 	svc_unregister(GET_DEVICE_IDS_PROG, GET_DEVICE_IDS_VERS);
+	pmap_unset(GET_DEVICE_IDS_PROG, GET_DEVICE_IDS_VERS);
 
         if (!svc_register(transp, GET_DEVICE_IDS_PROG, GET_DEVICE_IDS_VERS,clGetDeviceIDs_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (GET_DEVICE_IDS_PROG, GET_DEVICE_IDS_VERS, tcp).");
@@ -905,6 +908,7 @@ int main(){
 	printf("[main] svctcp_register GET_DEVICE_IDS_PROG OK\n");
 
 	svc_unregister(CREATE_CONTEXT_PROG, CREATE_CONTEXT_VERS);
+	pmap_unset(CREATE_CONTEXT_PROG, CREATE_CONTEXT_VERS);
 
         if (!svc_register(transp, CREATE_CONTEXT_PROG, CREATE_CONTEXT_VERS,clCreateContext_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (CREATE_CONTEXT_PROG, CREATE_CONTEXT_VERS, tcp).");
@@ -914,6 +918,7 @@ int main(){
 	printf("[main] svctcp_register CREATE_CONTEXT_PROG OK\n");
 
 	svc_unregister(CREATE_COMMAND_QUEUE_PROG, CREATE_COMMAND_QUEUE_VERS);
+	pmap_unset(CREATE_COMMAND_QUEUE_PROG, CREATE_COMMAND_QUEUE_VERS);
 
         if (!svc_register(transp, CREATE_COMMAND_QUEUE_PROG, CREATE_COMMAND_QUEUE_VERS,clCreateCommandQueue_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (CREATE_COMMAND_QUEUE_PROG, CREATE_COMMAND_QUEUE_VERS, tcp).");
@@ -923,6 +928,7 @@ int main(){
 	printf("[main] svctcp_register CREATE_COMMAND_QUEUE_PROG OK\n");
 
 	svc_unregister(CREATE_BUFFER_PROG, CREATE_BUFFER_VERS);
+	pmap_unset(CREATE_BUFFER_PROG, CREATE_BUFFER_VERS);
 
         if (!svc_register(transp, CREATE_BUFFER_PROG, CREATE_BUFFER_VERS,clCreateBuffer_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (CREATE_BUFFER_PROG, CREATE_BUFFER_VERS, tcp).");
@@ -932,6 +938,7 @@ int main(){
 	printf("[main] svctcp_register CREATE_BUFFER_PROG OK\n");
 
 	svc_unregister(CREATE_PROGRAM_WITH_SOURCE_PROG, CREATE_PROGRAM_WITH_SOURCE_VERS);
+	pmap_unset(CREATE_PROGRAM_WITH_SOURCE_PROG, CREATE_PROGRAM_WITH_SOURCE_VERS);
 
         if (!svc_register(transp, CREATE_PROGRAM_WITH_SOURCE_PROG, CREATE_PROGRAM_WITH_SOURCE_VERS,clCreateProgramWithSource_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (CREATE_PROGRAM_WITH_SOURCE_PROG, CREATE_PROGRAM_WITH_SOURCE_VERS, tcp).");
@@ -941,6 +948,7 @@ int main(){
 	printf("[main] svctcp_register CREATE_PROGRAM_WITH_SOURCE_PROG OK\n");
 
 	svc_unregister(BUILD_PROGRAM_PROG, BUILD_PROGRAM_VERS);
+	pmap_unset(BUILD_PROGRAM_PROG, BUILD_PROGRAM_VERS);
 
         if (!svc_register(transp, BUILD_PROGRAM_PROG, BUILD_PROGRAM_VERS,clBuildProgram_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (BUILD_PROGRAM_PROG, BUILD_PROGRAM_VERS, tcp).");
@@ -950,6 +958,7 @@ int main(){
 	printf("[main] svctcp_register BUILD_PROGRAM_PROG OK\n");
 
 	svc_unregister(CREATE_KERNEL_PROG, CREATE_KERNEL_VERS);
+	pmap_unset(CREATE_KERNEL_PROG, CREATE_KERNEL_VERS);
 
         if (!svc_register(transp, CREATE_KERNEL_PROG, CREATE_KERNEL_VERS,clCreateKernel_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (CREATE_KERNEL_PROG, CREATE_KERNEL_VERS, tcp).");
@@ -959,6 +968,7 @@ int main(){
 	printf("[main] svctcp_register CREATE_KERNEL_PROG OK\n");
 
 	svc_unregister(SET_KERNEL_ARG_PROG, SET_KERNEL_ARG_VERS);
+	pmap_unset(SET_KERNEL_ARG_PROG, SET_KERNEL_ARG_VERS);
 
         if (!svc_register(transp, SET_KERNEL_ARG_PROG, SET_KERNEL_ARG_VERS,clSetKernelArg_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (SET_KERNEL_ARG_PROG, SET_KERNEL_ARG_VERS, tcp).");
@@ -968,6 +978,7 @@ int main(){
 	printf("[main] svctcp_register SET_KERNEL_ARG_PROG OK\n");
 
         svc_unregister(ENQUEUE_WRITE_BUFFER_PROG, ENQUEUE_WRITE_BUFFER_VERS);
+        pmap_unset(ENQUEUE_WRITE_BUFFER_PROG, ENQUEUE_WRITE_BUFFER_VERS);
 
         if (!svc_register(transp, ENQUEUE_WRITE_BUFFER_PROG, ENQUEUE_WRITE_BUFFER_VERS,clEnqueueWriteBuffer_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (ENQUEUE_WRITE_BUFFER_PROG, ENQUEUE_WRITE_BUFFER_VERS, tcp).");
@@ -977,6 +988,7 @@ int main(){
         printf("[main] svctcp_register ENQUEUE_WRITE_BUFFER_PROG OK\n");
 
         svc_unregister(ENQUEUE_READ_BUFFER_PROG, ENQUEUE_READ_BUFFER_VERS);
+        pmap_unset(ENQUEUE_READ_BUFFER_PROG, ENQUEUE_READ_BUFFER_VERS);
 
         if (!svc_register(transp, ENQUEUE_READ_BUFFER_PROG, ENQUEUE_READ_BUFFER_VERS,clEnqueueReadBuffer_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (ENQUEUE_READ_BUFFER_PROG, ENQUEUE_READ_BUFFER_VERS, tcp).");
@@ -986,6 +998,7 @@ int main(){
         printf("[main] svctcp_register ENQUEUE_READ_BUFFER_PROG OK\n");
 
         svc_unregister(ENQUEUE_NDRANGE_KERNEL_PROG, ENQUEUE_NDRANGE_KERNEL_VERS);
+	pmap_unset(ENQUEUE_NDRANGE_KERNEL_PROG, ENQUEUE_NDRANGE_KERNEL_VERS);
 
         if (!svc_register(transp, ENQUEUE_NDRANGE_KERNEL_PROG, ENQUEUE_NDRANGE_KERNEL_VERS,clEnqueueNDRangeKernel_server_wrapper, IPPROTO_TCP)) {
                 printf ("%s", "unable to register (ENQUEUE_NDRANGE_KERNEL_PROG, ENQUEUE_NDRANGE_KERNEL_VERS, tcp).");
