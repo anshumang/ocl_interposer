@@ -517,15 +517,27 @@ void clCreateKernel_server(create_kernel_ *argp, create_kernel_ *retp){
 
         printf("[clCreateKernel_server] program %p\n", argp->program);
         printf("[clCreateKernel_server] kernel_name %s\n", argp->kernel_name.buff_ptr);
+        printf("[clCreateKernel_server] kernel_name length %d\n", argp->kernel_name.buff_len);
 
-        kernel  = clCreateKernel((cl_program)(argp->program), (const char *)(argp->kernel_name.buff_ptr), &err);
-        //kernel  = clCreateKernel((cl_program)(argp->program), "nw_kernel1", &err);
-        //kernel  = clCreateKernel((cl_program)(argp->program), "helloworld", &err);
+	char *kernel_name = (char *)calloc(argp->kernel_name.buff_len + 1, sizeof(char));
+	for(int i=0; i<argp->kernel_name.buff_len; i++){
+		kernel_name[i] = *((argp->kernel_name.buff_ptr) + i);
+	}
+	kernel_name[argp->kernel_name.buff_len] = '\0'; 
 
+        //kernel  = clCreateKernel((cl_program)(argp->program), (const char *)(argp->kernel_name.buff_ptr), &err);
+        //if(err != CL_SUCCESS){
+        //        printf("clCreateKernel failed with err %d\n", err);
+        //        exit(-1);
+        //}
+
+	err = CL_SUCCESS;
+        kernel  = clCreateKernel((cl_program)(argp->program), kernel_name, &err);
         if(err != CL_SUCCESS){
                 printf("clCreateKernel failed with err %d\n", err);
                 exit(-1);
         }
+
 	retp->err = err;
 
 	retp->kernel_name.buff_ptr = "\0";
